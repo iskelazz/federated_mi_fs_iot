@@ -1,0 +1,57 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Cliente App (sim_client_0)", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/client_pi/client_app.py", 
+            "console": "integratedTerminal",
+            "args": [
+                "--sim-id", "sim_client_iid_0_gisette" 
+            ],
+            "justMyCode": true 
+        },
+        {
+            "name": "Python: Cliente App (sim_client_1)", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/client_pi/client_app.py", 
+            "console": "integratedTerminal",
+            "args": [
+                "--sim-id", "sim_client_iid_1_gisette" 
+            ],
+            "justMyCode": true 
+        },
+        {
+            "name": "Python: Cliente App (sim_client_2)", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/client_pi/client_app.py", 
+            "console": "integratedTerminal",
+            "args": [
+                "--sim-id", "sim_client_iid_2_gisette" 
+            ],
+            "justMyCode": true 
+        },
+        {
+            "name": "Python: Cliente App (sim_client_3)", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/client_pi/client_app.py", 
+            "console": "integratedTerminal",
+            "args": [
+                "--sim-id", "sim_client_iid_3_gisette" 
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "Python: server App (server_app)", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/server_pc/server_app.py", 
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
