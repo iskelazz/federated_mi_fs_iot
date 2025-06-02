@@ -153,18 +153,108 @@ Archivo: [`utils.py`](utils.py)
 
 
 > **Aviso:** Se deben instalar las siguientes librerias para ejecutar este proyecto:
-> numpy
-> scipy
-> codecarbon
-> mqtt.paho
-> sklearn
+> numpy,
+> scipy,
+> codecarbon,
+> mqtt.paho,
+> sklearn,
 > zlib
 
 ---
 
 ## Uso
 
+### 1. Configurar selección de caracteristicas
 
+  En el archivo config.json de la raiz del proyecto debemos ajustar la selección de caracteristicas con los parametros deseados.
+  ```json
+  {
+    "DATASET_TO_LOAD_GLOBALLY": "mnist",
+    "MI_FS_METHOD": "JMI",
+    "NUM_SIMULATED_CLIENTS_TOTAL": 1,
+    "DISTRIBUTION_TYPE": "iid",
+    "NUM_BINS": 5,
+    "TOP_K_FEATURES_TO_SELECT": 75,
+    "TIMEOUT_SECONDS_OVERALL": 600,
+    "BROKER_ADDRESS_FOR_SERVER": "localhost",
+    "BROKER_ADDRESS_FOR_CLIENT": "localhost",
+    "PORT": 1883,
+    "AGGREGATION_METHOD": "simple",
+    "UNEVENNESS_FACTOR_NONIID": 0.0
+}
+  ```
+  **Parametros**:
+    - `DATASET_TO_LOAD_GLOBALLY`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
+    - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
+    - `NUM_SIMULATED_CLIENTS_TOTAL`: El número de clientes que usara la selección de caracteristicas, en nuestro caso igual al número de raspberrys usadas.
+    - `DISTRIBUTION_TYPE`: Tipo de distribución entre los clientes se puede seleccionar iid o non-iid.
+    - `NUM_BINS`: Número de bins para la discretación de los datos de los datasets.
+    - `TOP_K_FEATURES_TO_SELECT`: Número de caracteristicas a seleccionar.
+    - `TIMEOUT_SECONDS_OVERALL`: Timeout en el proceso de comunicación con los clientes en segundos, si se supera se aborta el proceso.
+    - `BROKER_ADDRESS_FOR_SERVER`: Dirección del broker MQTT para el servidor.
+    - `BROKER_ADDRESS_FOR_CLIENT`: Dirección del broker MQTT para el cliente.
+    - `PORT`: Puerto del broker MQTT.
+    - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
+    - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid el valor de este factor es un float, entre 0 y 1, determina el desbalanceo de muestras entre los clientes, siendo 0 un número de muestras identico entre los clientes y 1 un fuerte desbalanceo.
+
+### 2. Iniciar clientes
+
+  En cada raspberry pi acceder a la carpeta /client_pi y lanzar el siguiente comando en una terminal:
+  ```bash
+  # En raspberry Pi 1
+  python3 .\client_pi.py --sim-id sim_client_0
+  ```
+  Para sucesivas raspberry pi debemos cambiar i, por números sucesivos (0,1,2...n), en el argumento de --sim-id donde i es: sim_client_{i}, por ejemplo:
+  ```bash
+  # En raspberry Pi 2
+  python3 .\client_pi.py --sim-id sim_client_1
+  ```
+  ```bash
+  # En raspberry Pi 3
+  python3 .\client_pi.py --sim-id sim_client_2
+  ```
+
+### 3. Selección de caracteristicas federado
+
+  Para iniciar la selección de caracteristicas hay que ejecutar, en la carpeta /server_pc el siguiente comando:
+  ```bash
+  # En servidor
+  python3 .\server_app
+  ```
+
+  Usara la configuración de config.json de la raiz del proyecto, imprimira los resultados por pantalla y guardara las caracteristicas seleccionadas en la carpeta /selected_features de la raiz del proyecto. También almacenara los resultados de emisiones en la carpeta /emissions_output
+
+### 4. Selección de caracteristicas centralizado
+
+  Es un paso autónomo a los tres primeros, la configuración se realiza en las constantes de las primeras lineas de código del archivo /centralized/feature_selection_centralized.py
+
+  ```python
+    # --- Parámetros de Configuración ---
+    DATASET_NAME = "mnist"
+    TOP_K_FEATURES = 75
+    N_BINS_DISCRETIZATION = 5
+    MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM 
+  ```
+
+  **Parametros**:
+    - `DATASET_NAME`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
+    - `TOP_K_FEATURES`: Número de caracteristicas a seleccionar.
+    - `N_BINS_DISCRETIZATION`: Número de bins para la discretación de los datos de los datasets.
+    - `MI_TECHNIQUE_FUNCTION`: Algoritmo de IM, puede ser MIM o JMI.
+
+  Los resultados tambien se almacenaran en la carpeta /selected_features del mismo modo que el caso federado.
+
+### 5. Calculo de TPR
+
+  Este es el calculo de la Tasa de Verdaderos Positivos TPR = TP / k donde TP es el número de características comunes, y k es el número de características seleccionadas. Requiere haber completado los pasos 1, 2, 3 y 4 con la misma configuración. La instrucción en el terminal se lanza con la ruta del caso centralizado y federado `python3 .\calculate_TPR.py {dirección 1} {dirección 2}` el resultado se muestra en la terminal.
+
+  ```bash
+  python3 .\calculate_TPR.py selected_features\arcene_centralized_selected_top75_JMI_feature_indices.txt selected_features/arcene_federated_selected_top75_JMI_federated_feature_indices.txt
+  ```
+
+### 6. Proceso de clasificación
+
+  En este paso, usaremos algoritmos de clasificación (knn, random forest y regresión logística) para valorar su rendimiento con las caracteristicas seleccionadas y compararlo. {En construcción}
 
 ## Datasets Folder
 
