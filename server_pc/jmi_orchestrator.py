@@ -39,6 +39,9 @@ class JMIOrchestrator:
         self.current_batch_request_id = None
 
     def _initialize_first_feature(self):
+        """
+            Inicia el algoritmo JMI seleccionando la primera caracteristica con MIM
+        """
         if self.aggregated_XY_initial_tables is None or self.aggregated_XY_initial_tables.shape[0] == 0:
             print("Tablas P(Xi,Y) iniciales no disponibles o vacías.")
             return False
@@ -63,6 +66,9 @@ class JMIOrchestrator:
         return True
 
     def start_selection(self, aggregated_XY_tables, top_k_to_select):
+        """
+            Función que gestiona de forma completa el loop JMI hasta tener el conjunto de caracteristicas. En cada iteración realiza las peticiones al cliente, espera a recibir el resultado de todos ellos para seleccionar una nueva caracteristica
+        """
         print("Iniciando JMI.")
         self.aggregated_XY_initial_tables = aggregated_XY_tables
         

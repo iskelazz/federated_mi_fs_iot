@@ -54,6 +54,9 @@ class MQTTCommunicator:
     def set_publish_callback(self, callback): self.publish_callback = callback
 
     def connect(self):
+        """
+            Intenta establecer una conexión con el broker MQTT. Devuelve True si tiene éxito, False en caso contrario.
+        """
         try:
             self.client.connect(self.broker_address, self.port, 60)
             return True
@@ -73,6 +76,9 @@ class MQTTCommunicator:
         print(f"MQTTComm [{self.client_id}]: Llamada a client.disconnect() completada.")
 
     def publish(self, topic, payload_data, qos=0, retain=False):
+        """
+            Publica un mensaje en el topic especificado. Convierte automáticamente diccionarios y listas a formato JSON string antes de enviar.  Admite payloads de tipo string, bytes o los convierte a string. Devuelve el resultado de la publicación de Paho-MQTT o None en caso de error.
+        """
         payload_to_send = None
         if isinstance(payload_data, (dict, list)):
             payload_to_send = json.dumps(payload_data)

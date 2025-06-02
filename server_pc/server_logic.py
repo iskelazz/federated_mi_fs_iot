@@ -39,7 +39,7 @@ EMISSIONS_DATA_TOPIC = "tfg/fl/pi/emissions_data"
 
 
 class ServerLogic:
-    def __init__(self, project_root_path: str):
+    def __init__(self, project_root_path):
         self.project_root_app = project_root_path # Para guardar archivos, etc.
 
         # Estado de la ronda y configuración
@@ -71,10 +71,16 @@ class ServerLogic:
         print("ServerLogic instanciado.")
 
     def set_communicator(self, comm_instance: MQTTCommunicator):
+        """
+            Función para inyectar comunicador MQTT
+        """
         self.communicator = comm_instance
         self.emissions_manager.set_dependencies(self.communicator, self.jmi_lock, self.active_sim_clients)
 
     def set_round_parameters(self, mi_method, top_k, aggregation_method_str, num_bins):
+        """
+            Función para sobreescribir los valores de configuración por defecto
+        """
         self.mi_method = mi_method
         self.top_k_features = top_k
         self.aggregation_method = aggregation_method_str
@@ -400,7 +406,7 @@ class ServerLogic:
 
     def handle_pi_local_extremes(self, extremes_data):
         """
-            Maneja la recepcion de los extremos locales, los almacena y cuando llegan todos lanza un thread para generar los globales
+            Maneja la recepcion de los extremos locales, los almacena y cuando llegan todos lanza un thread para generar los máximos y mínimos globales
         """
         sim_client_id = extremes_data.get("sim_client_id")
         local_min_max_list = extremes_data.get("feature_min_max")
@@ -452,9 +458,9 @@ class ServerLogic:
                 client_state.error_message = "Payload 'local_extremes' inválido o lista feature_min_max es None."
                 print(f"SERVER_LOGIC: {client_state.error_message} de {sim_client_id}")
 
-    def handle_initial_XY_prob_results(self, data_payload: dict):
+    def handle_initial_XY_prob_results(self, data_payload):
         """
-            Maneja el almacenamiento de la primera recepcion de tablas de probabilidad
+            Maneja el almacenamiento de la primera recepcion de tablas de probabilidad.
         """
         sim_client_id = data_payload.get("sim_client_id")
         pickled_b64_str = data_payload.get("pickled_data_base64")
@@ -506,7 +512,7 @@ class ServerLogic:
                 client_state.error_message = "Payload P(Xi,Y) sin datos (pickled_b64_str es None o vacío)."
                 print(f"{client_state.error_message} de {sim_client_id}")
 
-    def handle_jmi_pair_prob_result(self, data_payload: dict):
+    def handle_jmi_pair_prob_result(self, data_payload):
         """
             Procesa un lote de tablas de probabilidad de tripletas P(Xk,Xj,Y) enviado por un cliente para una iteración JMI específica.
         """
@@ -536,7 +542,6 @@ class ServerLogic:
             decoded_data_bytes = base64.b64decode(pickled_batch_b64_str)
             data_to_unpickle = zlib.decompress(decoded_data_bytes) if is_compressed else decoded_data_bytes
             batch_triplet_results_list = pickle.loads(data_to_unpickle)
-            
             if not isinstance(batch_triplet_results_list, list):
                 raise ValueError("El payload del lote JMI deserializado no es una lista.")
 
@@ -557,14 +562,8 @@ class ServerLogic:
             for item in batch_triplet_results_list:
                 feature_pair_rcv = item.get("feature_pair")
                 triplet_table_l = item.get("triplet_table")
-
-                if not (feature_pair_rcv and isinstance(feature_pair_rcv, list) and len(feature_pair_rcv) == 2 and \
-                   all(isinstance(idx, int) for idx in feature_pair_rcv) and \
-                   isinstance(triplet_table_l, np.ndarray) and triplet_table_l.ndim == 3):
-                    print(f"Item inválido en lote de {sim_client_id} (req: {request_id_rcv}): Par: {feature_pair_rcv}, Tipo Tabla: {type(triplet_table_l)}. Omitiendo item.")
-                    continue 
-
                 pair_key = tuple(sorted(feature_pair_rcv))
+                
                 if pair_key not in orchestrator.current_iter_triplet_tables_from_clients:
                     orchestrator.current_iter_triplet_tables_from_clients[pair_key] = {
                         'tables_list': [], 
@@ -589,15 +588,13 @@ class ServerLogic:
         
         if processed_count_for_log > 0:
              print(f"Procesadas {processed_count_for_log}/{len(batch_triplet_results_list)} tablas del lote JMI de {sim_client_id}.")
-        elif not batch_triplet_results_list:
-             print(f"Lote JMI de {sim_client_id} para req_id {request_id_rcv} estaba vacío.")
         else: # batch_triplet_results_list no estaba vacío, pero no se procesó nada (ej. todo inválido)
              print(f"Lote JMI de {sim_client_id} para req_id {request_id_rcv} no contenía tablas válidas o ya procesadas.")
         
 
-    def on_server_message_received(self, topic: str, payload_bytes: bytes):
+    def on_server_message_received(self, topic, payload_bytes):
         """
-            Maneja la recepcion de mensajes
+            Maneja la recepcion de mensajes de los dispositivos del borde de la red.
         """
         payload_str = ""
         try:
@@ -635,9 +632,15 @@ class ServerLogic:
             print(f"Error guardando el archivo .txt de índices de características en '{output_filepath}': {e}")
 
     def send_emission_request_to_clients(self):
+        """
+            Petición a los clientes para que envien sus datos de consumo y emisiones.
+        """
         self.emissions_manager.request_emissions_from_clients()
 
     def on_connected_to_broker(self):
+        """
+            Topics a los que esta suscrito el servidor.
+        """
         print("Conectado al broker MQTT.")
         if self.communicator:
             self.communicator.subscribe(STATUS_TOPIC, qos=1)

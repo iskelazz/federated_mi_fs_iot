@@ -16,7 +16,7 @@ except ImportError as e:
 
 #Clase que maneja las emisiones en el servidor    
 class ServerEmissionsManager:
-    def __init__(self, project_root_path: str, server_id_for_log: str = "server"):
+    def __init__(self, project_root_path, server_id_for_log = "server"):
         self.server_tracker = EmissionsTracker(
             project_name=f"server_{server_id_for_log}", 
             output_dir=os.path.join(project_root_path, "emissions_output")
@@ -29,21 +29,32 @@ class ServerEmissionsManager:
         self.jmi_lock = None # O un lock específico para emisiones
         self.active_sim_clients_ref = None # Referencia al dict de ServerLogic
 
-    #Inyecta las dependencias necesarias para manejar las comunicaciones entre cliente y servidor
     def set_dependencies(self, communicator, lock, active_clients_ref):
+        """
+        Inyecta las dependencias necesarias para manejar las comunicaciones entre cliente y servidor.
+        """
         self.communicator = communicator
         self.jmi_lock = lock 
         self.active_sim_clients_ref = active_clients_ref
 
     def start_server_tracking(self):
+        """
+        Inicia la toma de mediciones de consumo y emisiones.
+        """
         self.server_tracker.start()
         
     def reset_server_tracking(self):
+        """
+        Devuelve el tracker a su estado inicial.
+        """
         self.collected_client_emissions.clear()
         self.clients_reported_emissions_count = 0
         self.num_clients_commanded_for_emissions = 0
     
     def _handle_server_emissions_data(self):
+        """
+        Para el tracker y devuelve los datos de consumo obtenidos del servidor.
+        """
         self.server_tracker.stop()
         # 2. Acceder a los datos finales del tracker
         if hasattr(self.server_tracker, 'final_emissions_data') and self.server_tracker.final_emissions_data is not None:
@@ -57,7 +68,10 @@ class ServerEmissionsManager:
         print(f"---------------------------------------------------------------------")
         return emissions_details
 
-    def prepare_for_new_client_emissions_round(self, num_clients_to_command: int):
+    def prepare_for_new_client_emissions_round(self, num_clients_to_command):
+        """
+            Establece el número de clientes para una ronda de medición de emisiones
+        """
         with self.jmi_lock: # Asumiendo que usamos el lock global
             self.collected_client_emissions.clear()
             self.client_reports_received = 0
@@ -65,6 +79,9 @@ class ServerEmissionsManager:
 
 
     def request_emissions_from_clients(self, client_id_target = None):
+        """
+            Solicita a los clientes los datos de emisiones a traves de un topic del protocolo de comunicación MQTT
+        """
         if not self.communicator or self.active_sim_clients_ref is None:
             print("SERVER_EMISSIONS_MANAGER: Comunicador o referencia a clientes activos no disponible.")
             return

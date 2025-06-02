@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/client_pi/client_app.py", 
             "console": "integratedTerminal",
             "args": [
-                "--sim-id", "sim_client_iid_0_gisette" 
+                "--sim-id", "sim_client_0" 
             ],
             "justMyCode": true 
         },
@@ -19,7 +19,7 @@
             "program": "${workspaceFolder}/client_pi/client_app.py", 
             "console": "integratedTerminal",
             "args": [
-                "--sim-id", "sim_client_iid_1_gisette" 
+                "--sim-id", "sim_client_1" 
             ],
             "justMyCode": true 
         },
@@ -30,7 +30,7 @@
             "program": "${workspaceFolder}/client_pi/client_app.py", 
             "console": "integratedTerminal",
             "args": [
-                "--sim-id", "sim_client_iid_2_gisette" 
+                "--sim-id", "sim_client_2" 
             ],
             "justMyCode": true 
         },
@@ -41,7 +41,7 @@
             "program": "${workspaceFolder}/client_pi/client_app.py", 
             "console": "integratedTerminal",
             "args": [
-                "--sim-id", "sim_client_iid_3_gisette" 
+                "--sim-id", "sim_client_3" 
             ],
             "justMyCode": true
         },

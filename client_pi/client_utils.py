@@ -32,18 +32,9 @@ def calculate_local_prob_dist_array(X_discretized, y_labels, num_bins, num_class
 
 def calculate_local_triplet_prob_dist(X_client_discretized, y_client_partition, k_idx, j_idx, num_bins, num_classes, sim_client_id_for_log="N/A_CLIENT"):
     """Calcula P_l(X_k, X_j, Y) usando np.histogramdd."""
-    if X_client_discretized is None or y_client_partition is None or not isinstance(num_bins, int) or not isinstance(num_classes, int) or num_bins <= 0 or num_classes <= 0:
-        return np.array([])
-
-    if X_client_discretized.ndim != 2:
-        return np.array([])
 
     n_samples = X_client_discretized.shape[0]
     if n_samples == 0:
-        return np.zeros((num_bins, num_bins, num_classes), dtype=float)
-
-    if k_idx >= X_client_discretized.shape[1] or j_idx >= X_client_discretized.shape[1] or k_idx < 0 or j_idx < 0:
-        print(f"[{sim_client_id_for_log}]: ERROR índice de característica en P(Xk,Xj,Y). k={k_idx}, j={j_idx}, max_idx={X_client_discretized.shape[1]-1}")
         return np.zeros((num_bins, num_bins, num_classes), dtype=float)
 
     try:

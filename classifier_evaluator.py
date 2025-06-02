@@ -29,19 +29,20 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Parámetros de Configuración Global ---
-DATASET_NAME = "internet_ads"
+DATASET_NAME = "mnist"
 CLASSIFIER_CHOICE = "RF"
 TEST_SPLIT_RATIO = 0.3
 RANDOM_STATE = 42
 SCALE_FEATURES = True
-USE_ALL_FEATURES = True # Cambia a True para usar el dataset completo
-
-
-SELECTED_FEATURES_FILE_PATH = os.path.join(PROJECT_ROOT, "datasets", "datasets_seleccionados_central", f"{DATASET_NAME}_federated_selected_top30_JMI_federated_feature_indices.txt")
+USE_ALL_FEATURES = False # Cambia a True para usar el dataset completo
+SELECTED_FEATURES_FILE_PATH = os.path.join(PROJECT_ROOT, "selected_features", f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt")
 
 DATASETS_WITH_PREDEFINED_TEST = ["gisette", "arcene"] # Datasets con conjunto de test separado
 
-def load_predefined_test_set(dataset_base_name: str, project_root_path: str):
+def load_predefined_test_set(dataset_base_name, project_root_path):
+    """
+        Carga los dataset con conjunto de test independiente.
+    """
     print(f"Intentando cargar conjunto de test predefinido para '{dataset_base_name}'...")
     X_test, y_test = None, None
     
@@ -89,7 +90,10 @@ def load_predefined_test_set(dataset_base_name: str, project_root_path: str):
     print(f"No se encontró un conjunto de test predefinido para '{dataset_base_name}' con las convenciones esperadas.")
     return None, None
 
-def load_selected_feature_indices(filepath: str):
+def load_selected_feature_indices(filepath):
+    """
+        Carga los dataset sin conjunto de test independiente.
+    """
     if not os.path.exists(filepath):
         print(f"Error: El archivo de índices de características '{filepath}' no fue encontrado.")
         return None
@@ -104,7 +108,10 @@ def load_selected_feature_indices(filepath: str):
         print(f"Error leyendo el archivo de índices '{filepath}': {e}")
         return None
 
-def evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name: str, dataset_name_log: str):
+def evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, dataset_name_log):
+    """
+        Ejecuta el proceso de clasificación, posteriormente muestra los resultados para un conjunto de metricas.
+    """
     print(f"\n--- Evaluando Clasificador: {classifier_name} en Dataset: {dataset_name_log} ---")
     model = None
     train_time_start = time.time() # Mover inicio de tiempo de entrenamiento aquí
@@ -175,7 +182,7 @@ def main():
 
     if not USE_ALL_FEATURES:
         # Actualizar la ruta del archivo de características para usar el DATASET_NAME configurado
-        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", f"{DATASET_NAME}_federated_selected_top30_JMI_federated_feature_indices.txt")
+        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt")
         # O ajusta la subcarpeta si es para resultados federados:
         print(f"Archivo de Características Seleccionadas: {current_selected_features_file_path}")
     

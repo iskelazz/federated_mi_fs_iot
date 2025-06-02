@@ -19,7 +19,7 @@ if PROJECT_ROOT not in sys.path: sys.path.insert(0, PROJECT_ROOT)
 if MQTT_HANDLERS_DIR not in sys.path: sys.path.insert(0, MQTT_HANDLERS_DIR)
 
 try:
-    from utils import load_dataset, discretize_with_global_ranges
+    from utils import load_dataset, discretize_equalwidth
     from client_utils import calculate_local_prob_dist_array, calculate_local_triplet_prob_dist
     from mqtt_handlers.mqtt_communicator import MQTTCommunicator
     from client_emissions_manager import ClientEmissionsManager
@@ -153,76 +153,99 @@ class ClientApp:
         except Exception as e:
             print(f"CLIENT_APP [{log_id}]: Error en on_message_received ('{topic}'): {type(e).__name__} - {e}. Payload: {payload_bytes[:200]}...")
 
-
-
-    def process_initial_command(self, command_data):
+    def _setup_job_and_load_data(self, command_data):
         """
-        Funcion que procesa la orden del servidor para iniciar la seleccion de caracteristicas, carga su parte del dataset y calcula min/max locales que 
-        envia al servidor
+        Configura el estado para un nuevo job basado en el comando del servidor
+        y carga la partición de datos correspondiente.
+        Inicia el tracker de emisiones para este job.
+        Devuelve True si todo fue exitoso, False en caso contrario.
         """
         payload_sim_client_id_from_cmd = command_data.get("sim_client_id")
-
-        self._reset_current_job(payload_sim_client_id_from_cmd)
+        self._reset_current_job(payload_sim_client_id_from_cmd) 
         
-        log_id = self.current_job_data["sim_client_id"]
-        action = command_data.get("action", "N/A")
+        log_id = self.current_job_data["sim_client_id"] # Ya establecido por _reset_current_job
+        
         self.current_job_data["dataset_name"] = command_data.get("dataset_name")
         client_indices = command_data.get("data_indices")
         num_global_classes_from_server = command_data.get("num_global_classes")
 
-        print(f"CLIENT_APP [{log_id}]: Comando '{action}' para dataset '{self.current_job_data['dataset_name']}' recibido.")
-        self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "RECEIVED_COMMAND_AND_INDICES"}, qos=1)
-
-        if not self.current_job_data["dataset_name"] or client_indices is None:
-            error_msg = "Comando inicial inválido ('dataset_name' o 'data_indices' faltan)."
-            print(f"CLIENT_APP [{log_id}]: {error_msg}")
-            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "ERROR", "error_message": error_msg}, qos=1)
-            return
-        self.tracker = ClientEmissionsManager(
-            project_name=f"client_job_{log_id}", 
-            output_dir=os.path.join(PROJECT_ROOT, "emissions_output")
+        client_output_dir = os.path.join(PROJECT_ROOT, "emissions_output", self.sim_id) # Carpeta por cliente
+        os.makedirs(client_output_dir, exist_ok=True)
+        self.tracker = ClientEmissionsManager( # Aquí usas ClientEmissionsManager
+            project_name=f"client_job_{log_id}_{self.current_job_data['dataset_name']}", # Nombre de proyecto más específico
+            output_dir=client_output_dir,
         )
-        # Aquí se iniciaría CodeCarbon si se reintroduce:
         self.tracker.start_tracking()
+        print(f"CLIENT_APP [{log_id}]: EmissionsTracker iniciado para job '{log_id}'.")
 
         try:
-            #Cargamos Dataset
             X_global, y_global = load_dataset(self.current_job_data["dataset_name"])
-            #Dividimos particion asignada
             self.current_job_data["X_client_partition"] = X_global[client_indices, :]
             self.current_job_data["y_client_partition"] = y_global[client_indices]
 
+            #Recibe el numero de clases globales del servidor, sino lo consulta en el dataset
             if num_global_classes_from_server is not None and isinstance(num_global_classes_from_server, int) and num_global_classes_from_server > 0:
                 self.current_job_data["num_classes"] = num_global_classes_from_server
             else:
                 y_unique_labels_init = np.unique(self.current_job_data["y_client_partition"])
                 self.current_job_data["num_classes"] = len(y_unique_labels_init) if y_unique_labels_init.size > 0 else 0
             
-
-            print(f"[{log_id}]: Partición cargada. X_shape: {self.current_job_data['X_client_partition'].shape}, "
+            print(f"CLIENT_APP [{log_id}]: Partición cargada. X_shape: {self.current_job_data['X_client_partition'].shape}, "
                   f"y_shape: {self.current_job_data['y_client_partition'].shape}, Num Clases (job): {self.current_job_data['num_classes']}")
-            
-            # Calculo de maximos y minimos locales
-            if self.current_job_data["X_client_partition"].size > 0 and self.current_job_data["X_client_partition"].shape[0] > 0:
-                local_mins = np.min(self.current_job_data["X_client_partition"], axis=0).tolist()
-                local_maxs = np.max(self.current_job_data["X_client_partition"], axis=0).tolist()
-                feature_min_max_list = [[float(min_val), float(max_val)] for min_val, max_val in zip(local_mins, local_maxs)]
-                extremes_payload = {
-                    "sim_client_id": log_id, 
-                    "dataset_name": self.current_job_data["dataset_name"],
-                    "feature_min_max": feature_min_max_list
-                }
-                #Enviamos extremos locales
-                self.communicator.publish(LOCAL_EXTREMES_TOPIC, extremes_payload, qos=1)
-                print(f"CLIENT_APP [{log_id}]: Mínimos/máximos locales enviados.")
-            else:
-                error_msg = "Partición de datos X vacía. No se pueden calcular min/max."
-                self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "ERROR", "error_message": error_msg}, qos=1)
-        except Exception as e_proc:
-            error_msg = f"Error procesando comando inicial: {type(e_proc).__name__} - {e_proc}"
-            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "ERROR", "error_message": error_msg}, qos=1)
+            return True # Configuración y carga de datos exitosa
 
-    def process_global_disc_params(self, params_data: dict):
+        except Exception as e_load:
+            error_msg = f"Error cargando o particionando datos para el job: {type(e_load).__name__} - {e_load}"
+            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "ERROR", "error_message": error_msg}, qos=1)
+            if self.tracker and self.tracker.is_tracking():
+                self.tracker.stop_tracking() # Detener tracker si falla la carga
+            return False
+
+    def _calculate_and_send_local_extremes(self):
+        """
+        Calcula los mínimos y máximos locales de la partición de datos actual
+        y los envía al servidor.
+        """
+        log_id = self.current_job_data.get("sim_client_id")
+
+        try:
+            local_mins = np.min(self.current_job_data["X_client_partition"], axis=0).tolist()
+            local_maxs = np.max(self.current_job_data["X_client_partition"], axis=0).tolist()
+            feature_min_max_list = [[float(min_val), float(max_val)] for min_val, max_val in zip(local_mins, local_maxs)]
+            
+            extremes_payload = {
+                "sim_client_id": log_id, 
+                "dataset_name": self.current_job_data["dataset_name"],
+                "feature_min_max": feature_min_max_list
+            }
+            self.communicator.publish(LOCAL_EXTREMES_TOPIC, extremes_payload, qos=1)
+            print(f"CLIENT_APP [{log_id}]: Mínimos/máximos locales enviados.")
+
+        except Exception as e_extremes:
+            error_msg = f"Error calculando o enviando extremos locales: {type(e_extremes).__name__} - {e_extremes}"
+            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "ERROR", "error_message": error_msg}, qos=1)
+            if self.tracker and self.tracker.is_tracking():
+                self.tracker.stop_tracking() # Detener tracker si falla la carga
+                
+    def process_initial_command(self, command_data):
+        """
+        Función que procesa la orden del servidor para iniciar la selección de características.
+        Primero configura el job y carga los datos, luego calcula y envía los extremos locales.
+        """
+        action_from_command = command_data.get("action", "N/A") # Para el log
+        current_sim_id_for_log = command_data.get("sim_client_id", self.sim_id) # Usar el ID del comando para el log si está disponible
+
+        print(f"CLIENT_APP [{current_sim_id_for_log}]: Comando '{action_from_command}' recibido.")
+
+        if self._setup_job_and_load_data(command_data):
+            log_id = self.current_job_data["sim_client_id"]
+            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "RECEIVED_COMMAND_AND_INDICES"}, qos=1)
+            self._calculate_and_send_local_extremes()
+        else:
+            # El error ya fue logueado y el tracker (si se inició) manejado por _setup_job_and_load_data
+            print(f"CLIENT_APP [{current_sim_id_for_log}]: Fallo en la configuración inicial del job. No se procede con el cálculo de extremos.")
+
+    def process_global_disc_params(self, params_data):
         """
         Funcion que gestiona la recepcion de los min/max globales del servidor y lanza el calculo para las tablas de probabilidad de I(Xk, Y)
         """
@@ -236,7 +259,7 @@ class ClientApp:
         try:
             
             if self.current_job_data["X_client_partition"] is not None and self.current_job_data["X_client_partition"].size > 0:
-                self.current_job_data["X_client_discretized"] = discretize_with_global_ranges(
+                self.current_job_data["X_client_discretized"] = discretize_equalwidth(
                     self.current_job_data["X_client_partition"],
                     bins=self.current_job_data["num_bins_global"],
                     feature_ranges=self.current_job_data["global_feature_ranges"]
@@ -244,7 +267,7 @@ class ClientApp:
                 print(f"[{active_job_id}]: Discretización local completada.")
                 self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "GLOBAL_PARAMS_RECEIVED_ACK"}, qos=1)
                 #Tras la discretizacion calculamos tablas de probabilidad
-                self.proceed_to_calculate_and_send_initial_probabilities()
+                self._proceed_to_calculate_and_send_initial_probabilities()
             else:
                 error_msg = "No hay datos locales (X_client_partition) para discretizar o está vacío."
                 self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "ERROR", "error_message": error_msg}, qos=1)
@@ -253,7 +276,10 @@ class ClientApp:
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "ERROR", "error_message": error_msg}, qos=1)
 
 
-    def proceed_to_calculate_and_send_initial_probabilities(self):
+    def _proceed_to_calculate_and_send_initial_probabilities(self):
+        """
+        Realiza el calculo inicial de las tablas de probabilidad, el paso MIM I(Xk, Y).
+        """
         sim_client_id = self.current_job_data.get("sim_client_id")
         if not sim_client_id: return
 
@@ -272,9 +298,10 @@ class ClientApp:
                 self.current_job_data["X_client_discretized"],
                 self.current_job_data["y_client_partition"],
                 self.current_job_data["num_bins_global"],
-                self.current_job_data["num_classes"] # Usar el num_classes del job actual
+                self.current_job_data["num_classes"] 
             )
 
+            #Se comprime el resultado para aligerar la carga de la red y del broker MQTT
             pickled_array = pickle.dumps(local_prob_array_XY)
             original_size = len(pickled_array)
             compressed_pickled_array = zlib.compress(pickled_array)
@@ -297,7 +324,10 @@ class ClientApp:
             error_msg = f"Error calculando/enviando P(Xi,Y) iniciales: {type(e_prob).__name__} - {e_prob}"
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": sim_client_id, "status": "ERROR", "error_message": error_msg}, qos=1)
 
-    def process_jmi_batch_triplet_request(self, command_data: dict):
+    def process_jmi_batch_triplet_request(self, command_data):
+        """
+        Recibiendo la última caracteristica seleccionada y las candidatas, procesa un batch del algoritmo JMI I((Xk,Xj), Y) envia los resultados al servidor
+        """
         active_job_id = self.current_job_data.get("sim_client_id")
 
         request_id = command_data.get("request_id")
@@ -326,7 +356,7 @@ class ClientApp:
                     self.current_job_data["num_classes"] # Usar num_classes del job
                 )
                 if p_xyz_table.size == 0 and self.current_job_data["num_bins_global"] > 0:
-                    print(f"[{active_job_id}]: ADVERTENCIA - Cálculo de P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id} resultó vacío. Omitiendo este par.")
+                    print(f"[{active_job_id}]: Cálculo de P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id} resultó vacío. Omitiendo este par.")
                     continue
                 batch_triplet_results.append({
                     "feature_pair": [k_idx, fixed_selected_idx],
@@ -338,8 +368,8 @@ class ClientApp:
         
         if batch_triplet_results:
             try:
+                #Se comprime el resultado para aligerar la carga de la red y del broker MQTT
                 pickled_batch_data = pickle.dumps(batch_triplet_results)
-
                 original_size = len(pickled_batch_data)
                 compressed_pickled_data = zlib.compress(pickled_batch_data)
                 compressed_size = len(compressed_pickled_data)
@@ -373,7 +403,7 @@ class ClientApp:
         self.communicator.publish(STATUS_TOPIC, status_payload_jmi_batch_done, qos=1)
         print(f"[{active_job_id}]: Finalizado envío de LOTE JMI (ID: {request_id}). {len(batch_triplet_results)} tablas en lote.")
 
-    def stop_save_and_send_emissions(self, emissions_topic: str):
+    def stop_save_and_send_emissions(self, emissions_topic):
             """
             Para el tracker de emisiones, obtiene los datos y los envía a un topic MQTT.
             """
@@ -382,9 +412,9 @@ class ClientApp:
             
             emissions_data_dict = self.tracker.stop_tracking_and_get_data(log_id)
 
-            # 3. Crear el payload
+            #Crear el payload
             payload = emissions_data_dict
-            # 4. Publicar el payload a un topic MQTT
+            #Publicar el payload a un topic MQTT
             msg_info = self.communicator.publish(emissions_topic, payload, qos=1)
 
             if msg_info and msg_info.rc == 0: # 0 es MQTT_ERR_SUCCESS

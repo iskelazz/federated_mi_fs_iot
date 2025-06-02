@@ -5,12 +5,6 @@ def calculate_mi_for_feature(p_XY_2D_table):
     """
     Calcula la Información Mutua I(X;Y) para una característica X y la clase Y.
     Utiliza logaritmo base 2 para expresar la MI en bits.
-
-    Args:
-        p_XY_2D_table (np.ndarray): Tabla de probabilidad conjunta P(X,Y) 2D (num_bins, num_clases).
-
-    Returns:
-        float: Valor de la Información Mutua, o 0.0 si no se puede calcular.
     """
     if p_XY_2D_table is None or p_XY_2D_table.ndim != 2:
         return 0.0
@@ -39,15 +33,6 @@ def calculate_mi_for_feature(p_XY_2D_table):
 def select_features_mim(p_XY_data_array_3D, top_k=15):
     """
     Realiza la selección de características utilizando el método MIM.
-
-    Args:
-        p_XY_data_array_3D (np.ndarray): Array 3D (n_características, num_bins, num_clases)
-                                         con las tablas P(Xi,Y) agregadas.
-        top_k (int): Número de características principales a seleccionar.
-
-    Returns:
-        tuple: (lista de índices de características seleccionadas, tiempo de ejecución en segundos).
-               Retorna (None, tiempo) si ocurre un error.
     """
 
     if p_XY_data_array_3D is None or p_XY_data_array_3D.ndim != 3 or p_XY_data_array_3D.shape[0] == 0:
@@ -86,12 +71,6 @@ def select_features_mim(p_XY_data_array_3D, top_k=15):
 def calculate_mi_for_triplet(p_XkXjY_table_3D):
     """
     Calcula la Información Mutua I( (Xk,Xj); Y ) para un par de características (Xk,Xj) y la clase Y.
-
-    Args:
-        p_XkXjY_table_3D (np.ndarray): Tabla de probabilidad conjunta P(Xk,Xj,Y) 3D
-                                     (num_bins_Xk, num_bins_Xj, num_classes).
-    Returns:
-        float: Valor de la Información Mutua I( (Xk,Xj); Y ), o 0.0 si no se puede calcular.
     """
 
     p_XkXj_2D = np.sum(p_XkXjY_table_3D, axis=2) 

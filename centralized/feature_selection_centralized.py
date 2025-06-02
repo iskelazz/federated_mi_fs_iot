@@ -17,7 +17,7 @@ except NameError:
         sys.path.append(PROJECT_ROOT)
 
 try:
-    from utils import load_dataset, disc_equalwidth
+    from utils import load_dataset, discretize_equalwidth
     from mutual_information import MIM, JMI
 except ImportError as e:
     print(f"Error importando módulos desde la raíz del proyecto ('{PROJECT_ROOT}'): {e}")
@@ -25,12 +25,12 @@ except ImportError as e:
     exit(1)
 
 # --- Parámetros de Configuración ---
-DATASET_NAME = "gisette"
-TOP_K_FEATURES = 5
+DATASET_NAME = "arcene"
+TOP_K_FEATURES = 75
 N_BINS_DISCRETIZATION = 5
 MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM si lo deseas
 
-def load_and_prepare_data(dataset_name_to_load: str, n_bins_for_discretization: int):
+def load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization):
     """
     Carga el dataset, asegura la forma correcta de X y lo discretiza.
     Devuelve X_original, X_discretizado, y, o (None, None, None) en caso de error.
@@ -50,15 +50,15 @@ def load_and_prepare_data(dataset_name_to_load: str, n_bins_for_discretization: 
 
     # Discretizar características
     try:
-        X_discrete = disc_equalwidth(X.astype(np.float32), bins=n_bins_for_discretization)
+        X_discrete = discretize_equalwidth(X.astype(np.float32), bins=n_bins_for_discretization)
     except Exception as e:
         print(f"Error durante la discretización de X para '{dataset_name_to_load}': {e}")
         return None, None, None
 
     return X, X_discrete, y
 
-def select_features_centralized(X_discrete_data: np.ndarray, y_labels: np.ndarray,
-                                mi_function, top_k: int, n_original_features: int):
+def select_features_centralized(X_discrete_data, y_labels,
+                                mi_function, top_k, n_original_features):
     """
     Aplica la selección de características centralizada.
     Devuelve los índices de las características seleccionadas (ordenados por relevancia) o None en caso de error.
@@ -73,9 +73,9 @@ def select_features_centralized(X_discrete_data: np.ndarray, y_labels: np.ndarra
         print(f"Ocurrió un error durante la selección de características con {mi_function.__name__}: {e}")
         return None
 
-def save_selected_features_txt(selected_feature_indices: np.ndarray,
-                               dataset_name_str: str, top_k_val: int, technique_name: str,
-                               project_root_path: str):
+def save_selected_features_txt(selected_feature_indices,
+                               dataset_name_str, top_k_val, technique_name,
+                               project_root_path):
     """
     Guarda los índices de las características seleccionadas (ordenados por relevancia) en un archivo .txt.
     """

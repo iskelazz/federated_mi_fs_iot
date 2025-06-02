@@ -102,49 +102,40 @@ def partition(X: np.ndarray, y: np.ndarray, users: dict) -> XYList:
     return list(data)
 
 
-def disc_equalwidth(X: np.ndarray, bins: int):
-    disc_X = np.zeros(X.shape, dtype=int)
-    for fea_index in range(X.shape[1]):
-        fea_values = X[:,fea_index]
-        bin_edges = np.linspace(fea_values.min(), fea_values.max()+1e-10, bins, endpoint=False)
-        disc_fea = np.digitize(fea_values, bin_edges, right=False)
-        _,_,disc_fea = np.unique(disc_fea, axis=0, return_index=True, return_inverse=True)
-        disc_X[:, fea_index] = disc_fea
-    return disc_X
-
-def discretize_with_global_ranges(X: np.ndarray, bins: int, feature_ranges: List[List[float]]):
+def discretize_equalwidth(X, bins, feature_ranges = None):
     disc_X = np.zeros(X.shape, dtype=int)
     num_features = X.shape[1]
 
-    if not feature_ranges or len(feature_ranges) != num_features:
-        raise ValueError(
-            f"feature_ranges debe ser una lista con un rango [min, max] para cada una de las {num_features} características."
-        )
-
     for fea_index in range(num_features):
         fea_values = X[:, fea_index]
-        min_g, max_g = feature_ranges[fea_index]
 
-        if min_g == max_g:
+        if feature_ranges:
+            min_val, max_val = feature_ranges[fea_index]
+        else:
+            min_val, max_val = fea_values.min(), fea_values.max()
+
+        if min_val == max_val:
             disc_X[:, fea_index] = 0
             continue
 
-        current_bin_edges = np.linspace(min_g, max_g, bins + 1, endpoint=True)
-        if current_bin_edges[-1] == max_g :
-             current_bin_edges[-1] += 1e-9
-        discretized_feature = np.digitize(fea_values, current_bin_edges, right=False)
-        discretized_feature = discretized_feature - 1 
-        discretized_feature[fea_values < min_g] = 0 
-        discretized_feature[fea_values >= max_g] = bins - 1
-        discretized_feature[discretized_feature < 0] = 0
-        discretized_feature[discretized_feature >= bins] = bins - 1
-        
-        disc_X[:, fea_index] = discretized_feature
-        
+        bin_edges = np.linspace(min_val, max_val, bins + 1, endpoint=True)
+        if bin_edges[-1] == max_val:
+            bin_edges[-1] += 1e-9  # evitar que valores exactamente iguales al máx caigan fuera de rango
+
+        disc_fea = np.digitize(fea_values, bin_edges, right=False) - 1
+
+        # Corrección de valores fuera de rango
+        disc_fea[fea_values < min_val] = 0
+        disc_fea[fea_values >= max_val] = bins - 1
+        disc_fea[disc_fea < 0] = 0
+        disc_fea[disc_fea >= bins] = bins - 1
+
+        disc_X[:, fea_index] = disc_fea
+
     return disc_X
 
 
-def calculate_uneven_quotas(total_samples: int, num_users: int, unevenness_factor: float) -> List[int]:
+def calculate_uneven_quotas(total_samples, num_users, unevenness_factor):
     """
     Calcula cuotas de muestras (enteros) para cada usuario de forma desbalanceada,
     asegurando que la suma de las cuotas sea igual a total_samples.
@@ -219,7 +210,7 @@ def calculate_uneven_quotas(total_samples: int, num_users: int, unevenness_facto
     return quotas_int.tolist()
 
 
-def build_noniid_uneven_no_loss(labels: np.ndarray, num_users: int, unevenness_factor: float = 0.5) -> Dict[int, List[int]]:
+def build_noniid_uneven_no_loss(labels, num_users, unevenness_factor = 0.5):
     total_samples = len(labels)
     all_original_indices = np.arange(total_samples)
 

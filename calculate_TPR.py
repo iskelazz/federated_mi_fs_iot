@@ -12,7 +12,7 @@ def load_feature_indices(filepath):
         print(f"Error leyendo el archivo de índices '{filepath}': {e}")
         return set()
 
-def calculate_tpr(ideal_features_set, evaluated_features_set, k_value: int = 0):
+def calculate_tpr(ideal_features_set, evaluated_features_set, k_value = 0):
     """
     Calcula la Tasa de Verdaderos Positivos (TPR) entre dos conjuntos de características.
     TPR = TP / k
