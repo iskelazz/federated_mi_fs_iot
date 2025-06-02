@@ -184,18 +184,18 @@ Archivo: [`utils.py`](utils.py)
 }
   ```
   **Parametros**:
-    - `DATASET_TO_LOAD_GLOBALLY`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
-    - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
-    - `NUM_SIMULATED_CLIENTS_TOTAL`: El número de clientes que usara la selección de caracteristicas, en nuestro caso igual al número de raspberrys usadas.
-    - `DISTRIBUTION_TYPE`: Tipo de distribución entre los clientes se puede seleccionar iid o non-iid.
-    - `NUM_BINS`: Número de bins para la discretación de los datos de los datasets.
-    - `TOP_K_FEATURES_TO_SELECT`: Número de caracteristicas a seleccionar.
-    - `TIMEOUT_SECONDS_OVERALL`: Timeout en el proceso de comunicación con los clientes en segundos, si se supera se aborta el proceso.
-    - `BROKER_ADDRESS_FOR_SERVER`: Dirección del broker MQTT para el servidor.
-    - `BROKER_ADDRESS_FOR_CLIENT`: Dirección del broker MQTT para el cliente.
-    - `PORT`: Puerto del broker MQTT.
-    - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
-    - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid el valor de este factor es un float, entre 0 y 1, determina el desbalanceo de muestras entre los clientes, siendo 0 un número de muestras identico entre los clientes y 1 un fuerte desbalanceo.
+  - `DATASET_TO_LOAD_GLOBALLY`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
+  - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
+  - `NUM_SIMULATED_CLIENTS_TOTAL`: El número de clientes que usara la selección de caracteristicas, en nuestro caso igual al número de raspberrys usadas.
+  - `DISTRIBUTION_TYPE`: Tipo de distribución entre los clientes se puede seleccionar iid o non-iid.
+  - `NUM_BINS`: Número de bins para la discretación de los datos de los datasets.
+  - `TOP_K_FEATURES_TO_SELECT`: Número de caracteristicas a seleccionar.
+  - `TIMEOUT_SECONDS_OVERALL`: Timeout en el proceso de comunicación con los clientes en segundos, si se supera se aborta el proceso.
+  - `BROKER_ADDRESS_FOR_SERVER`: Dirección del broker MQTT para el servidor.
+  - `BROKER_ADDRESS_FOR_CLIENT`: Dirección del broker MQTT para el cliente.
+  - `PORT`: Puerto del broker MQTT.
+  - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
+  - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid el valor de este factor es un float, entre 0 y 1, determina el desbalanceo de muestras entre los clientes, siendo 0 un número de muestras identico entre los clientes y 1 un fuerte desbalanceo.
 
 ### 2. Iniciar clientes
 
@@ -237,10 +237,10 @@ Archivo: [`utils.py`](utils.py)
   ```
 
   **Parametros**:
-    - `DATASET_NAME`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
-    - `TOP_K_FEATURES`: Número de caracteristicas a seleccionar.
-    - `N_BINS_DISCRETIZATION`: Número de bins para la discretación de los datos de los datasets.
-    - `MI_TECHNIQUE_FUNCTION`: Algoritmo de IM, puede ser MIM o JMI.
+  - `DATASET_NAME`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset valido para cargar en `load_dataset` de utils.py
+  - `TOP_K_FEATURES`: Número de caracteristicas a seleccionar.
+  - `N_BINS_DISCRETIZATION`: Número de bins para la discretación de los datos de los datasets.
+  - `MI_TECHNIQUE_FUNCTION`: Algoritmo de IM, puede ser MIM o JMI.
 
   Los resultados tambien se almacenaran en la carpeta /selected_features del mismo modo que el caso federado.
 
