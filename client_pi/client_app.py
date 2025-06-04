@@ -26,10 +26,8 @@ try:
 except ImportError as e:
     print(f"CLIENT_APP: ERROR crítico importando módulos: {e}. Verifique PYTHONPATH y la estructura de directorios.")
     sys.exit(1)
-
-# --- Constantes MQTT ---
-BROKER_ADDRESS = "localhost"
-PORT = 1883
+    
+    
 CLIENT_ID_PREFIX_PI = "pi_fs_node" # Prefijo para el ID de cliente MQTT
 
 # Topics a los que el cliente se suscribe o publica
@@ -43,10 +41,13 @@ JMI_PAIR_PROB_RESULTS_TOPIC = "tfg/fl/pi/jmi_pair_prob" # Cliente publica tablas
 EMISSIONS_DATA_TOPIC = "tfg/fl/pi/emissions_data" #Cliente publica los datos de consumo al servidor
 
 class ClientApp:
-    def __init__(self, sim_id, broker_address = BROKER_ADDRESS, port = PORT):
+    def __init__(self, sim_id):
+        
+        config = ClientApp._load_simulation_config(PROJECT_ROOT)
+        
         self.sim_id = sim_id 
-        self.broker_address = broker_address
-        self.port = port
+        self.broker_address = config["BROKER_ADDRESS_FOR_CLIENT"]
+        self.port = config["PORT"]
         self.tracker = None
         # Atributos para el estado interno
         self.current_job_data = self._initialize_job_state() 
@@ -57,6 +58,27 @@ class ClientApp:
         self.communicator = MQTTCommunicator(self.broker_address, self.port, client_id_prefix=mqtt_instance_client_id)
         
         self._setup_mqtt_callbacks()
+    
+    @staticmethod
+    def _load_simulation_config(project_root_path, config_filename="config.json"):
+        """Carga la configuración desde un archivo JSON."""
+        config_filepath = os.path.join(project_root_path, config_filename)
+        default_config = { 
+        "BROKER_ADDRESS_FOR_CLIENT": "localhost",
+        "PORT": 1883,
+        }
+        try:
+            with open(config_filepath, 'r') as f:
+                config = json.load(f)
+            print(f"Configuración cargada desde '{config_filepath}'.")
+            for key in default_config:
+                if key not in config:
+                    config[key] = default_config[key]
+                    print(f"Advertencia: Usando valor por defecto para '{key}': {default_config[key]}")
+            return config
+        except Exception as e:
+            print(f"Error cargando configuración desde '{config_filepath}': {e}. Usando configuración por defecto.")
+            return default_config 
 
     def _initialize_job_state(self):
         """Devuelve un diccionario con el estado inicial para un job."""
@@ -94,6 +116,8 @@ class ClientApp:
                 self.communicator.loop_forever()
             except Exception as e_loop:
                 print(f"[{self.sim_id}]: Error inesperado en el bucle principal: {type(e_loop).__name__} - {e_loop}")
+            except KeyboardInterrupt as e:
+                print(f"[{self.sim_id}]: Saliendo del cliente")
             finally:
                 self.cleanup()
         else:

@@ -27,7 +27,7 @@ share/python-wheels/
 MANIFEST
 
 #folders
-/emissions_output
+/emissions_output/*
 /selected_features
 
 # PyInstaller

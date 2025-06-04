@@ -29,15 +29,17 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Parámetros de Configuración Global ---
-DATASET_NAME = "mnist"
-CLASSIFIER_CHOICE = "RF"
+DATASET_NAME = "arcene"
+CLASSIFIER_CHOICE = "KNN"
 TEST_SPLIT_RATIO = 0.3
 RANDOM_STATE = 42
 SCALE_FEATURES = True
-USE_ALL_FEATURES = False # Cambia a True para usar el dataset completo
-SELECTED_FEATURES_FILE_PATH = os.path.join(PROJECT_ROOT, "selected_features", f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt")
+USE_ALL_FEATURES = True # Cambia a True para usar el dataset completo
+FILE_NAME =  f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt"
+# --------------------------------------------
 
-DATASETS_WITH_PREDEFINED_TEST = ["gisette", "arcene"] # Datasets con conjunto de test separado
+SELECTED_FEATURES_FILE_PATH = os.path.join(PROJECT_ROOT, "selected_features", FILE_NAME)
+DATASETS_WITH_PREDEFINED_TEST = [] # Datasets con conjunto de test separado
 
 def load_predefined_test_set(dataset_base_name, project_root_path):
     """
@@ -182,7 +184,7 @@ def main():
 
     if not USE_ALL_FEATURES:
         # Actualizar la ruta del archivo de características para usar el DATASET_NAME configurado
-        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt")
+        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", FILE_NAME)
         # O ajusta la subcarpeta si es para resultados federados:
         print(f"Archivo de Características Seleccionadas: {current_selected_features_file_path}")
     

@@ -18,7 +18,7 @@ except ImportError as e:
     print(f"ERROR crítico importando módulos: {e}. Verifique PYTHONPATH.")
     sys.exit(1)
 
-def load_simulation_config(project_root_path: str, config_filename="config.json"):
+def load_simulation_config(project_root_path, config_filename="config.json"):
     """Carga la configuración de simulación desde un archivo JSON."""
     config_filepath = os.path.join(project_root_path, config_filename)
     default_config = {
