@@ -281,7 +281,7 @@ def plot_label_dispersion_matplotlib_only(device_label_counts, client_order, lab
             bottom=bottom_values,
             label=str(label), # Asegurar que la etiqueta sea un string para la leyenda
             color=colors(i) if callable(colors) else colors[i], # Adaptar a cómo se accede a los colores del cmap
-            width=0.6
+            width=0.5
         )
         bottom_values += counts_for_current_label
 

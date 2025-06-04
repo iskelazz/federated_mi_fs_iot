@@ -21,7 +21,7 @@ class ServerEmissionsManager:
             project_name=f"server_{server_id_for_log}", 
             output_dir=os.path.join(project_root_path, "emissions_output")
         )
-        self.collected_client_emissions = {}
+        self.collected_client_energy = {}
         self.client_reports_expected = 0
         self.client_reports_received = 0
         
@@ -47,10 +47,10 @@ class ServerEmissionsManager:
         """
         Devuelve el tracker a su estado inicial.
         """
-        self.collected_client_emissions.clear()
+        self.collected_client_energy.clear()
         self.clients_reported_emissions_count = 0
         self.num_clients_commanded_for_emissions = 0
-    
+       
     def _handle_server_emissions_data(self):
         """
         Para el tracker y devuelve los datos de consumo obtenidos del servidor.
@@ -73,7 +73,7 @@ class ServerEmissionsManager:
             Establece el número de clientes para una ronda de medición de emisiones
         """
         with self.jmi_lock: # Asumiendo que usamos el lock global
-            self.collected_client_emissions.clear()
+            self.collected_client_energy.clear()
             self.client_reports_received = 0
             self.client_reports_expected = num_clients_to_command
 
@@ -116,11 +116,11 @@ class ServerEmissionsManager:
     def process_client_emission_report(self, data_payload):
         client_id = data_payload.get("sim_client_id")
         energy_kwh = data_payload.get("energy_consumed_kwh")
-        co2_kg = data_payload.get("co2_kg") 
+        co2_kg = data_payload.get("co2_emissions_kg") 
         if isinstance(energy_kwh, (float, int)) and client_id:
             with self.jmi_lock: # Proteger acceso
-                first_report_from_this_client_this_round = client_id not in self.collected_client_emissions
-                self.collected_client_emissions[client_id] = energy_kwh
+                first_report_from_this_client_this_round = client_id not in self.collected_client_energy 
+                self.collected_client_energy[client_id] = (energy_kwh, co2_kg)
                 if first_report_from_this_client_this_round:
                     self.client_reports_received += 1                
             self.check_and_print_aggregated_emissions()
@@ -133,15 +133,18 @@ class ServerEmissionsManager:
                 
                 server_emissions_details = self._handle_server_emissions_data()
                 server_energy_kwh = server_emissions_details.energy_consumed if server_emissions_details else 0.0
+                server_co2_kg = server_emissions_details.emissions if server_emissions_details else 0.0
 
                 total_client_energy_kwh = 0.0
+                total_client_co2_kg = 0.0
                 valid_client_reports_for_sum = 0
-                for energy_val in self.collected_client_emissions.values():
-                    if isinstance(energy_val, (float, int)):
-                        total_client_energy_kwh += energy_val
-                        valid_client_reports_for_sum += 1
+                for energy_val, co2_val in self.collected_client_energy.values():
+                    total_client_energy_kwh += energy_val
+                    total_client_co2_kg += co2_val
+                    valid_client_reports_for_sum += 1
                 
                 grand_total_energy = total_client_energy_kwh + server_energy_kwh
+                grand_total_emissions = total_client_co2_kg + server_co2_kg
 
                 print(f"---------------------------------------------------------------------")
                 print(f"SERVER_EMISSIONS_MANAGER: CONSUMO ENERGÉTICO AGREGADO TOTAL:")
@@ -149,8 +152,14 @@ class ServerEmissionsManager:
                 print(f"    Energía Clientes (agregada): {total_client_energy_kwh:.6f} kWh (de {valid_client_reports_for_sum} reportes)")
                 print(f"    TOTAL GENERAL: {grand_total_energy:.6f} kWh")
                 print(f"---------------------------------------------------------------------")
+                print(f"---------------------------------------------------------------------")
+                print(f"SERVER_EMISSIONS_MANAGER: EMISIONES CO2 AGREGADO TOTAL:")
+                print(f"    Emisiones Servidor: {server_co2_kg:.6f} kg")
+                print(f"    Emisiones Clientes (agregada): {total_client_co2_kg:.6f} kg (de {valid_client_reports_for_sum} reportes)")
+                print(f"    TOTAL GENERAL: {grand_total_emissions:.6f} kg")
+                print(f"---------------------------------------------------------------------")
                 
                 # Reset para la próxima posible ronda de solicitud de emisiones
                 self.client_reports_expected = 0 
                 self.client_reports_received = 0
-                self.collected_client_emissions.clear()
+                self.collected_client_energy.clear()
