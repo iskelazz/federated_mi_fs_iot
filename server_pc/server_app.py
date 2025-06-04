@@ -4,6 +4,7 @@ import sys
 import os
 import numpy as np
 
+
 # --- Configuración de Rutas para Importación ---
 SCRIPT_DIR_ORCH = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT_ORCH = os.path.dirname(SCRIPT_DIR_ORCH)
@@ -13,11 +14,12 @@ try:
     from mqtt_handlers.mqtt_communicator import MQTTCommunicator
     from server_logic import ServerLogic 
     from server_logic import SERVER_ID_PREFIX_PC
-    from utils import load_dataset, build_iid_data, build_noniid_data, build_noniid_uneven_no_loss
+    from utils import load_dataset, build_iid_data, build_noniid_data, build_noniid_uneven_no_loss, plot_label_dispersion_matplotlib_only
 except ImportError as e:
     print(f"ERROR crítico importando módulos: {e}. Verifique PYTHONPATH.")
     sys.exit(1)
-
+    
+    
 def load_simulation_config(project_root_path, config_filename="config.json"):
     """Carga la configuración de simulación desde un archivo JSON."""
     config_filepath = os.path.join(project_root_path, config_filename)
@@ -32,7 +34,8 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
         "BROKER_ADDRESS_FOR_SERVER": "localhost",
         "PORT": 1883,
         "AGGREGATION_METHOD": "simple",
-        "UNEVENNESS_FACTOR_NONIID": 0.0
+        "UNEVENNESS_FACTOR_NONIID": 0.0,
+        "PLOT_DISPERSION": "False"
     }
     try:
         with open(config_filepath, 'r') as f:
@@ -46,6 +49,56 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
     except Exception as e:
         print(f"Error cargando configuración desde '{config_filepath}': {e}. Usando configuración por defecto.")
         return default_config
+    
+def generate_and_display_label_dispersion(
+    config, 
+    unique_global_labels, 
+    num_total_clients, 
+    client_data_indices_map, 
+    global_labels_array, 
+    dataset_name_global, 
+    distribution_type_global
+):
+    """
+    Prepara los datos y genera un gráfico de dispersión de etiquetas si está habilitado en la config.
+    """
+    if not config.get("PLOT_DISPERSION", False):
+        return # No hacer nada si no está habilitado
+
+    print("Generando gráfico de dispersión de etiquetas...")
+    
+    all_possible_labels_sorted_str = sorted([str(l) for l in unique_global_labels])
+    client_names_for_plot_order = [f"Cliente {idx}" for idx in range(num_total_clients)]
+    
+    device_label_counts_for_plot = {}
+    for client_idx, client_name in enumerate(client_names_for_plot_order):
+        local_indices = client_data_indices_map.get(client_idx, [])
+        
+        current_client_label_counts = {}
+        if local_indices:
+            y_local_client = global_labels_array[local_indices]
+            unique_labels, counts = np.unique(y_local_client, return_counts=True)
+            current_client_label_counts = {str(label): count for label, count in zip(unique_labels, counts)}
+        
+        device_label_counts_for_plot[client_name] = {
+            global_label_str: current_client_label_counts.get(global_label_str, 0)
+            for global_label_str in all_possible_labels_sorted_str
+        }
+
+    plot_title = f"Distribución de Etiquetas para Dataset '{dataset_name_global}' ({distribution_type_global.upper()})"
+    
+    try:
+       
+        plot_label_dispersion_matplotlib_only(
+            device_label_counts_for_plot,
+            client_names_for_plot_order,
+            all_possible_labels_sorted_str,
+            title=plot_title
+        )
+    except ImportError:
+        print("ADVERTENCIA: La función 'plot_label_dispersion_matplotlib_only' no se pudo importar. No se generará el gráfico.")
+    except Exception as e_plot:
+        print(f"ERROR al generar el gráfico de dispersión: {e_plot}")
 
 def main():
     """Punto de entrada principal para el orquestador del servidor."""
@@ -109,6 +162,16 @@ def main():
         print(f"Tipo de distribución '{DISTRIBUTION_TYPE}' no reconocido. Usando IID.")
         user_indices_map = build_iid_data(y_global, NUM_SIMULATED_CLIENTS_TOTAL) # Fallback
 
+    generate_and_display_label_dispersion(
+        config,
+        unique_global_labels,
+        NUM_SIMULATED_CLIENTS_TOTAL,
+        user_indices_map,
+        y_global,
+        DATASET_TO_LOAD_GLOBALLY,
+        DISTRIBUTION_TYPE
+    )
+    
     global_start_time = time.time()
     # --- Envío de Comandos Iniciales ---
     active_client_ids_for_round = []
@@ -216,6 +279,7 @@ def main():
 
     print("Servidor y orquestador finalizados.")
     sys.exit(0) 
+    
 
 if __name__ == "__main__":
     main()

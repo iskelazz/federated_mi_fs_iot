@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Tuple, Union, List
+from typing import Tuple, List
 import numpy as np
-import time
 import scipy.io as sp
 import os
+import matplotlib.pyplot as plt
 
 XY = Tuple[np.ndarray, np.ndarray]
 XYList = List[XY]
@@ -38,7 +38,7 @@ def load_dataset_bin(name):
 
     return (X, y)
 
-def load_dataset_mat(name) -> Tuple: 
+def load_dataset_mat(name): 
     file_path = os.path.join(PROJECT_ROOT, 'datasets', name + '.mat')
     data = sp.loadmat(file_path)
     X = np.float32(data["data"])
@@ -46,7 +46,7 @@ def load_dataset_mat(name) -> Tuple:
     _, _, y = np.unique(y, return_index=True,return_inverse=True)
     return (X, y)
 
-def load_dataset(dataset_name) -> Tuple:
+def load_dataset(dataset_name):
     if dataset_name == "mnist":
         data_tuple = load_dataset_mat("MNIST_et")
     elif dataset_name == "internet_ads":
@@ -95,7 +95,7 @@ def build_noniid_data(dataset, labels, num_users):
         dict_users[i]  = list(dict_users[i].astype('int'))
     return dict_users
 
-def partition(X: np.ndarray, y: np.ndarray, users: dict) -> XYList:
+def partition(X, y, users):
     data = []
     for user in users.values():
         data.append((X[user,:],y[user]))
@@ -242,3 +242,55 @@ def build_noniid_uneven_no_loss(labels, num_users, unevenness_factor = 0.5):
         current_pointer = end_index
 
     return dict_users
+
+
+def plot_label_dispersion_matplotlib_only(device_label_counts, client_order, label_order, title="Distribución de Etiquetas por Cliente"):
+    """
+    Genera y muestra un gráfico de barras apiladas utilizando Matplotlib.
+    """
+    if not device_label_counts or not client_order or not label_order:
+        print("Datos insuficientes para generar el gráfico de dispersión.")
+        return
+
+    num_clients = len(client_order)
+    num_labels = len(label_order)
+
+    # Preparar los datos para Matplotlib: una lista de conteos por etiqueta para cada cliente
+    data_matrix = np.zeros((num_labels, num_clients))
+    for i, label in enumerate(label_order):
+        for j, client_name in enumerate(client_order):
+            data_matrix[i, j] = device_label_counts.get(client_name, {}).get(label, 0)
+
+    # Coordenadas X para las barras
+    x_positions = np.arange(num_clients)
+
+    # Para apilar: bottom_values[j] es la altura acumulada de la barra j ANTES de la etiqueta actual
+    bottom_values = np.zeros(num_clients)
+    _, ax = plt.subplots(figsize=(12, 8))
+    
+    # Colormap: 'tab10' es bueno para hasta 10 etiquetas, 'tab20' para más.
+    colormap_name = 'tab10' if num_labels <= 10 else 'tab20'
+    colors = plt.cm.get_cmap(colormap_name, num_labels)
+
+
+    for i, label in enumerate(label_order):
+        counts_for_current_label = data_matrix[i, :]
+        ax.bar(
+            x_positions,
+            counts_for_current_label,
+            bottom=bottom_values,
+            label=str(label), # Asegurar que la etiqueta sea un string para la leyenda
+            color=colors(i) if callable(colors) else colors[i], # Adaptar a cómo se accede a los colores del cmap
+            width=0.6
+        )
+        bottom_values += counts_for_current_label
+
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel("Clientes", fontsize=12)
+    ax.set_ylabel("Número de Muestras", fontsize=12)
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(client_order, rotation=45, ha="right")
+    
+    ax.legend(title='Etiquetas', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+    plt.tight_layout(rect=[0, 0, 0.85, 1]) # Ajustar para la leyenda
+    plt.show()
