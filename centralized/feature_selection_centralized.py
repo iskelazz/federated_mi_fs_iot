@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -25,10 +26,39 @@ except ImportError as e:
     exit(1)
 
 # --- Parámetros de Configuración ---
-DATASET_NAME = "arcene"
-TOP_K_FEATURES = 75
-N_BINS_DISCRETIZATION = 5
-MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM si lo deseas
+#DATASET_NAME = "arcene"
+#TOP_K_FEATURES = 75
+#N_BINS_DISCRETIZATION = 5
+#MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM si lo deseas
+
+
+def load_simulation_config(project_root_path, config_filename="config.json"):
+    """Carga la configuración de simulación desde un archivo JSON."""
+    config_filepath = os.path.join(project_root_path, config_filename)
+    default_config = {
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
+        "TOP_K_FEATURES_TO_SELECT": 75,
+        "NUM_BINS": 5,
+        "MI_FS_METHOD": "JMI"
+    }
+    try:
+        with open(config_filepath, 'r') as f:
+            all_config = json.load(f)
+        print(f"Configuración cargada desde '{config_filepath}'.")
+        config = all_config.get("FS_CENTRALIZED")
+        if config is None:
+            print(f"Advertencia: La clave 'FS_CENTRALIZED' no se encontró en '{config_filepath}'. "
+                  f"Usando la configuración por defecto completa para 'FS_CENTRALIZED'.")
+            # Si "FEATURE_SELECTION" no está, devolvemos el default completo para esta sección.
+            return config
+        for key in default_config:
+            if key not in config:
+                config[key] = default_config[key]
+                print(f"Advertencia: Usando valor por defecto para '{key}': {default_config[key]}")
+        return config
+    except Exception as e:
+        print(f"Error cargando configuración desde '{config_filepath}': {e}. Usando configuración por defecto.")
+        return default_config
 
 def load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization):
     """
@@ -98,47 +128,57 @@ def save_selected_features_txt(selected_feature_indices,
 
 
 def main():
-    global_start_time = time.time()
-    print(f"--- Iniciando Selección de Características Centralizada para el dataset: {DATASET_NAME} ---")
-    print(f"Usando Técnica de MI: {MI_TECHNIQUE_FUNCTION.__name__}")
-    print(f"Top K Características a seleccionar: {TOP_K_FEATURES}")
-    print(f"Número de bins para discretización: {N_BINS_DISCRETIZATION}\n")
+    cfg = load_simulation_config(PROJECT_ROOT)
 
-    X_original, X_discrete, y = load_and_prepare_data(DATASET_NAME, N_BINS_DISCRETIZATION)
+    # Extraer los parámetros de la configuración cargada
+    dataset_name = cfg["DATASET_TO_LOAD_GLOBALLY"]
+    top_k_features = cfg["TOP_K_FEATURES_TO_SELECT"]
+    n_bins_discretization = cfg["NUM_BINS"]
+    mi_fs_method = cfg["MI_FS_METHOD"]
+    mi_function = None
+    if mi_fs_method.upper() == "JMI":
+        mi_function = JMI  
+    elif mi_fs_method.upper() == "MIM":
+        mi_function = MIM
+    else:
+        print("Error: Técnica de IM {mi_fs_method} incorrecta")
+        return
+    
+    global_start_time = time.time()
+    print(f"--- Iniciando Selección de Características Centralizada para el dataset: {dataset_name} ---")
+    print(f"Usando Técnica de MI: {mi_function.__name__}")
+    print(f"Top K Características a seleccionar: {top_k_features}")
+    print(f"Número de bins para discretización: {n_bins_discretization}\n")
+
+    X_original, X_discrete, y = load_and_prepare_data(dataset_name, n_bins_discretization)
     if X_original is None: # Si la carga o preparación falló
-        print(f"--- Proceso abortado para {DATASET_NAME} debido a errores en la carga/preparación ---")
+        print(f"--- Proceso abortado para {dataset_name} debido a errores en la carga/preparación ---")
         return
 
     n_features_original = X_original.shape[1]
 
     selected_indices = select_features_centralized(X_discrete, y,
-                                                 MI_TECHNIQUE_FUNCTION,
-                                                 TOP_K_FEATURES,
+                                                 mi_function,
+                                                 top_k_features,
                                                  n_features_original)
 
     if selected_indices is None:
-        print(f"--- Proceso abortado para {DATASET_NAME} debido a errores en la selección de características ---")
+        print(f"--- Proceso abortado para {dataset_name} debido a errores en la selección de características ---")
         return
 
-    actual_top_k = min(TOP_K_FEATURES, n_features_original)
+    actual_top_k = min(top_k_features, n_features_original)
 
     # Guardar los índices de las características seleccionadas en formato .txt
     save_selected_features_txt(selected_indices,
-                               DATASET_NAME, actual_top_k,
-                               MI_TECHNIQUE_FUNCTION.__name__,
+                               dataset_name, actual_top_k,
+                               mi_function.__name__,
                                PROJECT_ROOT)
     
     global_end_time = time.time()
     total_elapsed_time = global_end_time - global_start_time
     print(f"--- TIEMPO TOTAL DE EJECUCIÓN DEL SERVIDOR: {total_elapsed_time:.4f} segundos ---")
 
-    print(f"\n--- Proceso de Selección de Características Centralizada para {DATASET_NAME} finalizado ---")
+    print(f"\n--- Proceso de Selección de Características Centralizada para {dataset_name} finalizado ---")
 
 if __name__ == "__main__":
-    def print_config_warning():
-        print(f"La variable DATASET_NAME no está configurada adecuadamente, por favor, edita el script y cambia DATASET_NAME (actualmente: '{DATASET_NAME}')")
-
-    if not DATASET_NAME or DATASET_NAME == "tu_dataset_aqui": # Añadida una comprobación más robusta
-        print_config_warning()
-    else:
-        main()
+    main()

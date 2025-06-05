@@ -1,14 +1,32 @@
 {
-    "DATASET_TO_LOAD_GLOBALLY": "gisette",
-    "MI_FS_METHOD": "JMI",
-    "NUM_SIMULATED_CLIENTS_TOTAL": 2,
-    "DISTRIBUTION_TYPE": "non-iid",
-    "NUM_BINS": 5,
-    "TOP_K_FEATURES_TO_SELECT": 10,
-    "TIMEOUT_SECONDS_OVERALL": 600,
-    "BROKER_ADDRESS_FOR_SERVER": "localhost",
-    "PORT": 1883,
-    "AGGREGATION_METHOD": "simple",
-    "UNEVENNESS_FACTOR_NONIID": 0.0,
-    "PLOT_DISPERSION": false
+    "FS_FEDERATED": {
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
+        "MI_FS_METHOD": "JMI",
+        "NUM_SIMULATED_CLIENTS_TOTAL": 2,
+        "DISTRIBUTION_TYPE": "iid",
+        "NUM_BINS": 5,
+        "TOP_K_FEATURES_TO_SELECT": 75,
+        "TIMEOUT_SECONDS_OVERALL": 600,
+        "BROKER_ADDRESS_FOR_SERVER": "localhost",
+        "BROKER_ADDRESS_FOR_CLIENT": "localhost",
+        "PORT": 1883,
+        "AGGREGATION_METHOD": "simple",
+        "UNEVENNESS_FACTOR_NONIID": 0.0,
+        "PLOT_DISPERSION": false
+    },
+    "FS_CENTRALIZED":{
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
+        "TOP_K_FEATURES_TO_SELECT": 75,
+        "NUM_BINS": 5,
+        "MI_FS_METHOD": "JMI"
+    },
+    "CLASSIFIER": {
+        "DATASET_NAME": "mnist",
+        "CLASSIFIER_CHOICE": "KNN",
+        "TEST_SPLIT_RATIO":0.3,
+        "SCALE_FEATURES": true,
+        "USE_ALL_FEATURES": true,
+        "ITERATIONS": 5,
+        "FILE_NAME_FS": "mnist_federated_selected_top75_JMI_federated_feature_indices.txt"
+    }
 }

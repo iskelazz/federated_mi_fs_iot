@@ -18,6 +18,7 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
     - Es el núcleo del cliente, se encarga de gestionar las operaciones que le corresponden. 
     - Gestión de operaciones MQTT (`_setup_mqtt_callbacks`, `start`, `cleanup`, `on_connected`, `on_disconnected`, `on_message_received`)
     - Reseteo de estado del cliente (`_initialize_job_state`, `_reset_current_job`)
+    - Carga de configuración de config.json (`_load_simulation_config`)
     - `process_initial_command(self, command_data)`: Función de inicio del proceso de selección de características, llama a las funciones _setup_job_and_load_data y _calculate_and_send_local_extremes.
     - `_setup_job_and_load_data(self, command_data)`: Configuración inicial del cliente, carga la parte del dataset que le corresponde al cliente e inicia el tracker de emisiones.
     - `_calculate_and_send_local_extremes(self)`: Calcula los máximos y mínimos locales de cada característica y los envía al servidor. 
@@ -76,7 +77,8 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
   - **server_app**
   Archivo [`server_app.py`] 
     - Se encarga de gestionar el hilo principal del servidor, recibe los datos de configuración de la selección de características y los gestiona, tambien gestiona el bucle principal y da conclusión al proceso.
-
+    - Carga de configuración de config.json (`_load_simulation_config`).
+    - `generate_and_display_label_dispersion(config,unique_global_labels,num_total_clients,client_data_indices_map,global_labels_array,dataset_name_global,distribution_type_global)`: Crea un gráfico para poder visualizar la dispersión de los datos entre los clientes.
   - **ServerEmissionsManager**
   Archivo [`server_emissions_manager.py`]
     - Se encarga del soporte a las operaciones con codecarbon para estimar el consumo del proceso de selección de características asi como su emisión de gases de CO2.
@@ -128,6 +130,7 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
     - `load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization)`: Carga el dataset, asegura la forma correcta de X y lo discretiza.
     - `select_features_centralized(X_discrete_data, y_labels, mi_function, top_k, n_original_features)`: Se encarga de llamar a las funciones de selección de características.
     - `save_selected_features_txt(selected_feature_indices, dataset_name_str, top_k_val, technique_name, project_root_path)`: Guarda las características seleccionadas en un .txt en la carpeta /selected_features en la raíz del proyecto.
+    - Carga de configuración de config.json (`load_simulation_config`).
 
 - **calculate_TPR**
 Archivo [calculate_TPR.py](calculate_TPR.py)
@@ -141,6 +144,7 @@ Archivo [classifier_evaluator.py](classifier_evaluator.py)
   - `load_predefined_test_set(dataset_base_name, project_root_path)`: Carga los dataset con conjunto de test independiente.
   - `load_selected_feature_indices(filepath)`: Carga los dataset sin conjunto de test independiente.
   - `evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, dataset_name_log)`: Ejecuta el proceso de clasificación, posteriormente muestra los resultados para un conjunto de métricas.
+  - - Carga de configuración de config.json (`load_simulation_config`).
   
 
 - **Utilidades**
@@ -149,8 +153,9 @@ Archivo: [`utils.py`](utils.py)
   - Particionado de información: IID (`build_iid_data`) y non‑IID (`build_noniid_data`).  
   - Separación de datos para los diferentes clientes (`partition`).  
   - Discretización de un dataset con un número de bins dado (`disc_equalwidth`).
-  - Calculo de cuotas de muestras (enteros) para cada usuario de forma desbalanceada (`calculate_uneven_quotas`)
-  - Reparto desbalanceado de muestras entre los diferentes clientes (`build_noniid_uneven_no_loss(labels, num_users, unevenness_factor = 0.5)`)
+  - Calculo de cuotas de muestras (enteros) para cada usuario de forma desbalanceada (`calculate_uneven_quotas`).
+  - Reparto desbalanceado de muestras entre los diferentes clientes (`build_noniid_uneven_no_loss(labels, num_users, unevenness_factor = 0.5)`).
+  - `plot_label_dispersion_matplotlib_only(device_label_counts, client_order, label_order, title="Distribución de Etiquetas por Cliente")`:  Genera y muestra un gráfico de barras apiladas utilizando Matplotlib.
 
 
 > **Aviso:** Se deben instalar las siguientes librerías para ejecutar este proyecto:
@@ -158,8 +163,7 @@ Archivo: [`utils.py`](utils.py)
 > scipy,
 > codecarbon,
 > mqtt.paho,
-> sklearn,
-> zlib
+> sklearn
 
 ---
 
@@ -170,20 +174,41 @@ Archivo: [`utils.py`](utils.py)
   En el archivo config.json de la raíz del proyecto debemos ajustar la selección de características con los parametros deseados.
   ```json
   {
-    "DATASET_TO_LOAD_GLOBALLY": "mnist",
-    "MI_FS_METHOD": "JMI",
-    "NUM_SIMULATED_CLIENTS_TOTAL": 1,
-    "DISTRIBUTION_TYPE": "iid",
-    "NUM_BINS": 5,
-    "TOP_K_FEATURES_TO_SELECT": 75,
-    "TIMEOUT_SECONDS_OVERALL": 600,
-    "BROKER_ADDRESS_FOR_SERVER": "localhost",
-    "BROKER_ADDRESS_FOR_CLIENT": "localhost",
-    "PORT": 1883,
-    "AGGREGATION_METHOD": "simple",
-    "UNEVENNESS_FACTOR_NONIID": 0.0
+    "FS_FEDERATED": {
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
+        "MI_FS_METHOD": "JMI",
+        "NUM_SIMULATED_CLIENTS_TOTAL": 1,
+        "DISTRIBUTION_TYPE": "iid",
+        "NUM_BINS": 5,
+        "TOP_K_FEATURES_TO_SELECT": 75,
+        "TIMEOUT_SECONDS_OVERALL": 600,
+        "BROKER_ADDRESS_FOR_SERVER": "localhost",
+        "BROKER_ADDRESS_FOR_CLIENT": "localhost",
+        "PORT": 1883,
+        "AGGREGATION_METHOD": "simple",
+        "UNEVENNESS_FACTOR_NONIID": 0.0,
+        "PLOT_DISPERSION": false
+    },
+    "FS_CENTRALIZED":{
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
+        "TOP_K_FEATURES_TO_SELECT": 75,
+        "NUM_BINS": 5,
+        "MI_FS_METHOD": "JMI"
+    },
+    "CLASSIFIER": {
+        "DATASET_NAME": "mnist",
+        "CLASSIFIER_CHOICE": "KNN",
+        "TEST_SPLIT_RATIO":0.3,
+        "SCALE_FEATURES": true,
+        "USE_ALL_FEATURES": true,
+        "ITERATIONS": 5,
+        "FILE_NAME_FS": "mnist_federated_selected_top75_JMI_federated_feature_indices.txt"
+    }
 }
   ```
+  ## FS_FEDERATED
+  Configuración necesaria para el proceso de selección de caracteristicas federado.
+
   **Parametros**:
   - `DATASET_TO_LOAD_GLOBALLY`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset válido para cargar en `load_dataset` de utils.py
   - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
@@ -197,6 +222,28 @@ Archivo: [`utils.py`](utils.py)
   - `PORT`: Puerto del broker MQTT.
   - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
   - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid, el valor de este factor es un float entre 0 y 1 determina el desbalanceo de muestras entre los clientes, siendo 0 un número identico de muestras entre los clientes y 1 un fuerte desbalanceo.
+  - `PLOT_DISPERSION`: Si es true, devuelve un gráfico de barras apiladas que representa la dispersión del dataset entre los clientes.
+
+  ## FS_CENTRALIZED
+  Configuración necesaria para el proceso de selección de caracteristicas centralizado.
+
+  **Parametros**:
+  - `DATASET_TO_LOAD_GLOBALLY`: Dataset sobre el cual se realiza la selección de caracteristicas, debe ser un dataset válido para cargar en `load_dataset` de utils.py
+  - `TOP_K_FEATURES_TO_SELECT`: Número de caracteristicas a seleccionar.
+  - `NUM_BINS`: Número de bins para la discretación de los datos de los datasets.
+  - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
+
+  ## CLASSIFIER
+  Configuración necesaria para el proceso de clasificación.
+
+  **Parametros**:
+  - `DATASET_NAME`: Dataset sobre el cual se realiza el proceso de clasificación, debe ser un dataset válido para cargar en `load_dataset` de utils.py
+  - `CLASSIFIER_CHOICE`: Técnica de clasificación seleccionada, estan soportadas KNN (es kNN 5 vecinos), RF (Random Forest), NAIVE_BAYES (Método Naive bayes), LOGISTIC_REGRESSION (regresión logistica con kernel liblinear).
+  - `TEST_SPLIT_RATIO`: Partición entre el conjunto de entrenamiento y el de test, el valor (representado entre 0 y 1) es el porcentaje del conjunto de test, el resto se usara para entrenamiento.
+  - `SCALE_FEATURES`: Indica si se escalan o no las caracteristicas.
+  - `USE_ALL_FEATURES`: Si es true se entrenara el modelo con todas las características, si es falso usara el valor de FILE_NAME_FS, para seleccionar las caracteristicas indicadas en ese .txt.
+  - `ITERATIONS`: Iteraciones de entrenamientos y métricas con un dataset, tiene el objetivo de obtener un valor más consistente para la precisión asi como una desviación tipica.
+  - `FILE_NAME_FS`: Valor para indicar el nombre del archivo que contiene las características seleccionadas, se encontra por defecto en la carpeta /selected_features. 
 
 ### 2. Iniciar clientes
 
@@ -223,25 +270,16 @@ Archivo: [`utils.py`](utils.py)
   python3 .\server_app
   ```
 
-  Usará la configuración de config.json de la raíz del proyecto, imprimirá los resultados por pantalla y guardará las características seleccionadas en la carpeta /selected_features de la raíz del proyecto. También almacenará los resultados de emisiones en la carpeta /emissions_output
+  Usará la configuración de config.json de la raíz del proyecto (El bloque FS_FEDERATED), imprimirá los resultados por pantalla y guardará las características seleccionadas en la carpeta /selected_features de la raíz del proyecto. También almacenará los resultados de emisiones en la carpeta /emissions_output
 
 ### 4. Selección de caracteristicas centralizado
 
-  Es un paso autónomo a los tres primeros, la configuración se realiza en las constantes de las primeras lineas de código del archivo /centralized/feature_selection_centralized.py
+  Es un paso autónomo a los tres primeros, la configuración se realiza en el archivo de la raíz del proyecto config.json (el bloque FS_CENTRALIZED). El archivo ejecutable es /centralized/feature_selection_centralized.py
 
-  ```python
-    # --- Parámetros de Configuración ---
-    DATASET_NAME = "mnist"
-    TOP_K_FEATURES = 75
-    N_BINS_DISCRETIZATION = 5
-    MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM 
+  ```bash
+  python3 .\feature_selection_centralized.py
   ```
 
-  **Parametros**:
-  - `DATASET_NAME`: Dataset sobre el cual se realiza la selección de características; debe ser un dataset válido para cargar en `load_dataset` de utils.py
-  - `TOP_K_FEATURES`: Número de características a seleccionar.
-  - `N_BINS_DISCRETIZATION`: Número de bins para la discretación de los datos de los datasets.
-  - `MI_TECHNIQUE_FUNCTION`: Algoritmo de IM, puede ser MIM o JMI.
 
   Los resultados también se almacenarán en la carpeta /selected_features del mismo modo que el caso federado.
 
@@ -255,7 +293,11 @@ Archivo: [`utils.py`](utils.py)
 
 ### 6. Proceso de clasificación
 
-  En este paso, usaremos algoritmos de clasificación (KNN, Random Forest y Regresión Logística) para valorar su rendimiento con las características seleccionadas y compararlo. {En construcción}
+  En este paso, usaremos algoritmos de clasificación (KNN, Random Forest y Regresión Logística) para valorar su rendimiento con las características seleccionadas y compararlo. La configuración de la clasificación se realizará en el archivo config.json de la raíz del proyecto (El bloque CLASSIFIER), devolverá métricas para cada iteración asi como una evaluación final más robusta con todas las iteraciones. Se debe ejecutar el archivo classifier_evaluator.py de la raíz del proyecto.
+
+  ```bash
+  python3 .\classifier_evaluator.py
+  ```
 
 ## Datasets Folder
 

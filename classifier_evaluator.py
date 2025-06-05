@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import numpy as np
@@ -28,18 +29,36 @@ except ImportError as e:
     print(f"Error importando 'load_dataset' desde 'utils.py': {e}")
     sys.exit(1)
 
-# --- Parámetros de Configuración Global ---
-DATASET_NAME = "arcene"
-CLASSIFIER_CHOICE = "KNN"
-TEST_SPLIT_RATIO = 0.3
-RANDOM_STATE = 42
-SCALE_FEATURES = True
-USE_ALL_FEATURES = True # Cambia a True para usar el dataset completo
-FILE_NAME =  f"{DATASET_NAME}_federated_selected_top75_JMI_federated_feature_indices.txt"
-# --------------------------------------------
-
-SELECTED_FEATURES_FILE_PATH = os.path.join(PROJECT_ROOT, "selected_features", FILE_NAME)
-DATASETS_WITH_PREDEFINED_TEST = [] # Datasets con conjunto de test separado
+def load_simulation_config(project_root_path, config_filename="config.json"):
+    """Carga la configuración de simulación desde un archivo JSON."""
+    config_filepath = os.path.join(project_root_path, config_filename)
+    default_config = {
+        "DATASET_NAME": "mnist",
+        "CLASSIFIER_CHOICE": "KNN",
+        "TEST_SPLIT_RATIO":0.3,
+        "SCALE_FEATURES": True,
+        "USE_ALL_FEATURES": True,
+        "ITERATIONS": 5,
+        "FILE_NAME_FS": "mnist_federated_selected_top75_JMI_federated_feature_indices.txt"
+    }
+    try:
+        with open(config_filepath, 'r') as f:
+            all_config = json.load(f)
+        print(f"Configuración cargada desde '{config_filepath}'.")
+        config = all_config.get("CLASSIFIER")
+        if config is None:
+            print(f"Advertencia: La clave 'CLASSIFIER' no se encontró en '{config_filepath}'. "
+                  f"Usando la configuración por defecto completa para 'CLASSIFIER'.")
+            # Si "FEATURE_SELECTION" no está, devolvemos el default completo para esta sección.
+            return config
+        for key in default_config:
+            if key not in config:
+                config[key] = default_config[key]
+                print(f"Advertencia: Usando valor por defecto para '{key}': {default_config[key]}")
+        return config
+    except Exception as e:
+        print(f"Error cargando configuración desde '{config_filepath}': {e}. Usando configuración por defecto.")
+        return default_config
 
 def load_predefined_test_set(dataset_base_name, project_root_path):
     """
@@ -121,9 +140,9 @@ def evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, datas
     if classifier_name == "KNN":
         model = KNeighborsClassifier(n_neighbors=5)
     elif classifier_name == "RF":
-        model = RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1)
+        model = RandomForestClassifier(n_estimators=100, n_jobs=-1)
     elif classifier_name == "LOGISTIC_REGRESSION":
-        model = LogisticRegression(random_state=RANDOM_STATE, max_iter=1000, solver='liblinear')
+        model = LogisticRegression(max_iter=1000, solver='liblinear')
     elif classifier_name == "NAIVE_BAYES":
         model = GaussianNB()
     else:
@@ -133,13 +152,15 @@ def evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, datas
     print("Entrenando el modelo...")
     model.fit(X_train, y_train)
     train_time_end = time.time()
-    print(f"Tiempo de entrenamiento: {train_time_end - train_time_start:.4f} segundos.")
+    train_time = train_time_end - train_time_start
+    print(f"Tiempo de entrenamiento: {train_time:.4f} segundos.")
 
     print("Realizando predicciones en el conjunto de prueba...")
     predict_time_start = time.time()
     y_pred = model.predict(X_test)
     predict_time_end = time.time()
-    print(f"Tiempo de predicción: {predict_time_end - predict_time_start:.4f} segundos.")
+    predict_time = predict_time_end - predict_time_start
+    print(f"Tiempo de predicción: {predict_time:.4f} segundos.")
 
     accuracy = accuracy_score(y_test, y_pred)
     print(f"\nExactitud (Accuracy): {accuracy:.4f}")
@@ -162,37 +183,49 @@ def evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, datas
     print(cm)
     
     precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(y_test, y_pred, average='micro', zero_division=0)
-    precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(y_test, y_pred, average='macro', zero_division=0)
-    precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(y_test, y_pred, average='weighted', zero_division=0)
+    #precision_macro, recall_macro, f1_macro, _ = precision_recall_fscore_support(y_test, y_pred, average='macro', zero_division=0)
+    #precision_weighted, recall_weighted, f1_weighted, _ = precision_recall_fscore_support(y_test, y_pred, average='weighted', zero_division=0)
 
     print("\nMétricas Promediadas Detalladas:")
     print(f"  Precision (Micro):   {precision_micro:.4f}")
     print(f"  Recall (Micro):      {recall_micro:.4f}")
     print(f"  F1-score (Micro):    {f1_micro:.4f}")
-    print(f"  Precision (Macro):   {precision_macro:.4f}")
-    print(f"  Recall (Macro):      {recall_macro:.4f}")
-    print(f"  F1-score (Macro):    {f1_macro:.4f}")
-    print(f"  Precision (Weighted):{precision_weighted:.4f}")
-    print(f"  Recall (Weighted):   {recall_weighted:.4f}")
-    print(f"  F1-score (Weighted): {f1_weighted:.4f}")
+    
+    results = {
+        "accuracy": accuracy,
+        "train_time": train_time,
+        "predict_time": predict_time
+    }
+    return results
 
 def main():
-    print(f"--- Iniciando Evaluación de Clasificador ---")
-    print(f"Dataset: {DATASET_NAME}")
-    print(f"Clasificador Elegido: {CLASSIFIER_CHOICE}")
-    print(f"Usar todas las características: {'Sí' if USE_ALL_FEATURES else 'No'}")
+    cfg = load_simulation_config(PROJECT_ROOT)
 
-    if not USE_ALL_FEATURES:
+    # Extraer los parámetros de la configuración cargada
+    dataset_name = cfg["DATASET_NAME"]
+    classifier_choice = cfg["CLASSIFIER_CHOICE"]
+    test_split_ratio = cfg["TEST_SPLIT_RATIO"]
+    scale_features = cfg["SCALE_FEATURES"]
+    use_all_features = cfg["USE_ALL_FEATURES"]
+    iterations = cfg["ITERATIONS"]
+    file_name_for_selected_features = cfg["FILE_NAME_FS"]
+    
+    print(f"--- Iniciando Evaluación de Clasificador ---")
+    print(f"Dataset: {dataset_name}")
+    print(f"Clasificador Elegido: {classifier_choice}")
+    print(f"Usar todas las características: {'Sí' if use_all_features else 'No'}")
+
+    if not use_all_features:
         # Actualizar la ruta del archivo de características para usar el DATASET_NAME configurado
-        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", FILE_NAME)
+        current_selected_features_file_path = os.path.join(PROJECT_ROOT, "selected_features", file_name_for_selected_features)
         # O ajusta la subcarpeta si es para resultados federados:
         print(f"Archivo de Características Seleccionadas: {current_selected_features_file_path}")
     
-    print(f"Ratio de División para Prueba: {TEST_SPLIT_RATIO if DATASET_NAME not in DATASETS_WITH_PREDEFINED_TEST else 'N/A (Test predefinido)'}")
-    print(f"Escalar Características: {'Sí' if SCALE_FEATURES else 'No'}")
+    print(f"Ratio de División para Prueba: {test_split_ratio}")
+    print(f"Escalar Características: {'Sí' if scale_features else 'No'}")
 
     selected_indices = None
-    if not USE_ALL_FEATURES:
+    if not use_all_features:
         selected_indices = load_selected_feature_indices(current_selected_features_file_path)
         if selected_indices is None or len(selected_indices) == 0:
             print(f"No se pudieron cargar los índices de características o no hay características seleccionadas. Abortando.")
@@ -201,96 +234,88 @@ def main():
     else:
         print("Se usarán todas las características disponibles del dataset.")
 
-    X_train_raw, y_train_raw = None, None
-    X_test_raw, y_test_raw = None, None
+
     X_global_raw, y_global_raw = None, None # Para el caso de train_test_split
 
-    use_predefined_test = DATASET_NAME in DATASETS_WITH_PREDEFINED_TEST
     
     try:
-        if use_predefined_test:
-            print(f"Usando conjunto de entrenamiento y test predefinidos para '{DATASET_NAME}'.")
-            X_train_raw, y_train_raw = load_dataset(DATASET_NAME) # Asume que esto carga el conjunto de entrenamiento/validación
-            if X_train_raw is None or y_train_raw is None: raise ValueError(f"load_dataset({DATASET_NAME}) devolvió None para datos de entrenamiento.")
-            print(f"Cargado X_train_raw: {X_train_raw.shape}, y_train_raw: {y_train_raw.shape}")
-
-            X_test_raw, y_test_raw = load_predefined_test_set(DATASET_NAME, PROJECT_ROOT)
-            if X_test_raw is None or y_test_raw is None: raise ValueError(f"load_predefined_test_set({DATASET_NAME}) no pudo cargar el conjunto de test.")
-            print(f"Cargado X_test_raw: {X_test_raw.shape}, y_test_raw: {y_test_raw.shape}")
-        else:
-            print(f"Usando train_test_split para '{DATASET_NAME}'.")
-            X_global_raw, y_global_raw = load_dataset(DATASET_NAME)
-            if X_global_raw is None or y_global_raw is None: raise ValueError("load_dataset devolvió None.")
-            print(f"Dataset '{DATASET_NAME}' cargado. Forma original de X: {X_global_raw.shape}, Forma de y: {y_global_raw.shape}")
+        print(f"Usando train_test_split para '{dataset_name}'.")
+        X_global_raw, y_global_raw = load_dataset(dataset_name)
+        if X_global_raw is None or y_global_raw is None: raise ValueError("load_dataset devolvió None.")
+        print(f"Dataset '{dataset_name}' cargado. Forma original de X: {X_global_raw.shape}, Forma de y: {y_global_raw.shape}")
     except Exception as e:
-        print(f"Error cargando datos para '{DATASET_NAME}': {e}")
+        print(f"Error cargando datos para '{dataset_name}': {e}")
         return
+    results_acuraccy = []
+    results_train_time = []
+    results_predict_time = []
+    for i in range(iterations):
+        X_train_final, X_test_final = None, None
+        y_train_final, y_test_final = None, None
 
-    X_train_final, X_test_final = None, None
-    y_train_final, y_test_final = None, None
-
-    # --- Aplicar selección de características o usar todas ---
-    if not USE_ALL_FEATURES:
-        if selected_indices is None: 
-             print("Error: Se indicó usar características seleccionadas pero los índices no están disponibles.")
-             return
-        try:
-            # Validar que los índices no excedan las dimensiones del dataset cargado
-            max_dim_check = X_train_raw.shape[1] if use_predefined_test else X_global_raw.shape[1]
-            if np.any(selected_indices >= max_dim_check) or np.any(selected_indices < 0):
-                print(f"Error: Índices de características ({np.min(selected_indices)}-{np.max(selected_indices)}) fuera de rango (0 a {max_dim_check-1}).")
+        # --- Aplicar selección de características o usar todas ---
+        if not use_all_features:
+            if selected_indices is None: 
+                print("Error: Se indicó usar características seleccionadas pero los índices no están disponibles.")
                 return
-            
-            if use_predefined_test:
-                X_train_final = X_train_raw[:, selected_indices]
-                X_test_final = X_test_raw[:, selected_indices]
-                y_train_final = y_train_raw
-                y_test_final = y_test_raw
-            else:
+            try:
+                # Validar que los índices no excedan las dimensiones del dataset cargado
+                max_dim_check = X_global_raw.shape[1]
+                if np.any(selected_indices >= max_dim_check) or np.any(selected_indices < 0):
+                    print(f"Error: Índices de características ({np.min(selected_indices)}-{np.max(selected_indices)}) fuera de rango (0 a {max_dim_check-1}).")
+                    return
+                
                 X_selected_global = X_global_raw[:, selected_indices]
                 X_train_final, X_test_final, y_train_final, y_test_final = train_test_split(
-                    X_selected_global, y_global_raw, test_size=TEST_SPLIT_RATIO,
-                    random_state=RANDOM_STATE, stratify=y_global_raw if len(np.unique(y_global_raw)) > 1 else None
-                )
-            print(f"Forma de X_train después de seleccionar características: {X_train_final.shape}")
-            if X_test_final is not None: print(f"Forma de X_test después de seleccionar características: {X_test_final.shape}")
+                    X_selected_global, y_global_raw, test_size=test_split_ratio,
+                    )
+                print(f"Forma de X_train después de seleccionar características: {X_train_final.shape}")
+                if X_test_final is not None: print(f"Forma de X_test después de seleccionar características: {X_test_final.shape}")
 
-        except IndexError as e:
-            print(f"Error de Indexación al seleccionar características: {e}")
-            return
-        except Exception as e:
-            print(f"Error inesperado durante la selección de características: {e}")
-            return
-    else: # Usar todas las características
-        if use_predefined_test:
-            X_train_final = X_train_raw
-            X_test_final = X_test_raw
-            y_train_final = y_train_raw
-            y_test_final = y_test_raw
-        else:
+            except IndexError as e:
+                print(f"Error de Indexación al seleccionar características: {e}")
+                return
+            except Exception as e:
+                print(f"Error inesperado durante la selección de características: {e}")
+                return
+        else: # Usar todas las características
             X_train_final, X_test_final, y_train_final, y_test_final = train_test_split(
-                X_global_raw, y_global_raw, test_size=TEST_SPLIT_RATIO,
-                random_state=RANDOM_STATE, stratify=y_global_raw if len(np.unique(y_global_raw)) > 1 else None
+                X_global_raw, y_global_raw, test_size=test_split_ratio,
+                stratify=y_global_raw if len(np.unique(y_global_raw)) > 1 else None
             )
-        print(f"Usando todas las características. Forma de X_train: {X_train_final.shape}")
-        if X_test_final is not None: print(f"Forma de X_test: {X_test_final.shape}")
+            print(f"Usando todas las características. Forma de X_train: {X_train_final.shape}")
+            if X_test_final is not None: print(f"Forma de X_test: {X_test_final.shape}")
 
 
-    if X_train_final is None or X_test_final is None or y_train_final is None or y_test_final is None:
-        print("Error: Los conjuntos de datos finales (train/test) no se generaron correctamente.")
-        return
+        if X_train_final is None or X_test_final is None or y_train_final is None or y_test_final is None:
+            print("Error: Los conjuntos de datos finales (train/test) no se generaron correctamente.")
+            return
 
-    # Escalar características
-    if SCALE_FEATURES:
-        print("Escalando características (StandardScaler)...")
-        scaler = StandardScaler()
-        X_train_final = scaler.fit_transform(X_train_final)
-        X_test_final = scaler.transform(X_test_final)
+        # Escalar características
+        if scale_features:
+            print("Escalando características (StandardScaler)...")
+            scaler = StandardScaler()
+            X_train_final = scaler.fit_transform(X_train_final)
+            X_test_final = scaler.transform(X_test_final)
 
-    # Entrenar y evaluar el clasificador
-    evaluate_classifier(X_train_final, X_test_final, y_train_final, y_test_final, CLASSIFIER_CHOICE, DATASET_NAME)
+        # Entrenar y evaluar el clasificador
+        results = evaluate_classifier(X_train_final, X_test_final, y_train_final, y_test_final, classifier_choice, dataset_name)
+        
+        # Almacenar parametros para evaluación final
+        results_acuraccy.append(results["accuracy"])
+        results_train_time.append(results["train_time"])
+        results_predict_time.append(results["predict_time"])
 
-    print(f"\n--- Evaluación de Clasificador Finalizada ---")
+        print(f"\n--- Evaluación de Clasificador Finalizada ---")
+    mean_accuracy = np.mean(results_acuraccy)
+    std_accuracy = np.std(results_acuraccy)
+    mean_train_time = np.mean(results_train_time)
+    mean_predict_time = np.mean(results_predict_time)
+        
+    print(f"\n\n--- RESULTADOS FINALES DE LAS {len(results_acuraccy)} ITERACIONES ---")
+    print(f"Exactitud (Accuracy): Media = {mean_accuracy:.4f}, Desviación Típica = {std_accuracy:.4f}")
+    print(f"Tiempo medio: Entrenamiento = {mean_train_time:.4f} segundos, Predicción: {mean_predict_time:.4f} segundos")
+    
 
 if __name__ == "__main__":
     main()

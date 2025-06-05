@@ -39,8 +39,14 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
     }
     try:
         with open(config_filepath, 'r') as f:
-            config = json.load(f)
+            all_config = json.load(f)
         print(f"Configuración cargada desde '{config_filepath}'.")
+        config = all_config.get("FS_FEDERATED")
+        if config is None:
+            print(f"Advertencia: La clave 'FS_FEDERATED' no se encontró en '{config_filepath}'. "
+                  f"Usando la configuración por defecto completa para 'FS_FEDERATED'.")
+            # Si "FS_FEDERATED" no está, devolvemos el default completo para esta sección.
+            return config
         for key in default_config:
             if key not in config:
                 config[key] = default_config[key]

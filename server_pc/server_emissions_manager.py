@@ -17,6 +17,13 @@ except ImportError as e:
 #Clase que maneja las emisiones en el servidor    
 class ServerEmissionsManager:
     def __init__(self, project_root_path, server_id_for_log = "server"):
+        emissions_dir = os.path.join(project_root_path, "emissions_output")
+        
+        try:
+            os.makedirs(emissions_dir, exist_ok=True)
+            print(f"ServerEmissionsManager: Ensured 'emissions_output' directory exists at: {emissions_dir}")
+        except OSError as e:
+            print(f"ServerEmissionsManager: CRITICAL ERROR creating 'emissions_output' directory at {emissions_dir}: {e}")
         self.server_tracker = EmissionsTracker(
             project_name=f"server_{server_id_for_log}", 
             output_dir=os.path.join(project_root_path, "emissions_output")
