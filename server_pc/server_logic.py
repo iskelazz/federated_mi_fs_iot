@@ -303,7 +303,7 @@ class ServerLogic:
                 print(f"MIM no seleccionó características o devolvió una lista vacía.")
             with self.jmi_lock:
                 self.collected_initial_XY_prob_tables.clear()
-                self.clients_reported_initial_XY_count = 0
+                #self.clients_reported_initial_XY_count = 0
             
 
         elif self.mi_method == "JMI":

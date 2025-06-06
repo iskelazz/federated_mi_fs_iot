@@ -163,7 +163,8 @@ Archivo: [`utils.py`](utils.py)
 > scipy,
 > codecarbon,
 > mqtt.paho,
-> sklearn
+> scikit-learn,
+> matplotlib
 
 ---
 
