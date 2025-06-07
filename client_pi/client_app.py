@@ -1,7 +1,7 @@
 import json
+import logging
 import pickle
 import base64
-from typing import Optional
 import zlib
 import numpy as np
 import os
@@ -19,6 +19,7 @@ if PROJECT_ROOT not in sys.path: sys.path.insert(0, PROJECT_ROOT)
 if MQTT_HANDLERS_DIR not in sys.path: sys.path.insert(0, MQTT_HANDLERS_DIR)
 
 try:
+    from timer import Timer
     from utils import load_dataset, discretize_equalwidth
     from client_utils import calculate_local_prob_dist_array, calculate_local_triplet_prob_dist
     from mqtt_handlers.mqtt_communicator import MQTTCommunicator
@@ -27,7 +28,13 @@ except ImportError as e:
     print(f"CLIENT_APP: ERROR crítico importando módulos: {e}. Verifique PYTHONPATH y la estructura de directorios.")
     sys.exit(1)
     
-    
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)8s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("client_app")
+   
 CLIENT_ID_PREFIX_PI = "pi_fs_node" # Prefijo para el ID de cliente MQTT
 
 # Topics a los que el cliente se suscribe o publica
@@ -39,6 +46,8 @@ LOCAL_EXTREMES_TOPIC = "tfg/fl/pi/local_extremes" # Cliente publica sus min/max 
 DATA_RESULTS_TOPIC = "tfg/fl/pi/data_results" # Cliente publica tablas P(Xi,Y) iniciales
 JMI_PAIR_PROB_RESULTS_TOPIC = "tfg/fl/pi/jmi_pair_prob" # Cliente publica tablas P(Xk,Xj,Y) para JMI
 EMISSIONS_DATA_TOPIC = "tfg/fl/pi/emissions_data" #Cliente publica los datos de consumo al servidor
+
+BENCH_TOPIC = "tfg/fl/pi/bench"
 
 class ClientApp:
     def __init__(self, sim_id):
@@ -76,7 +85,7 @@ class ClientApp:
                 print(f"Advertencia: La clave 'FS_FEDERATED' no se encontró en '{config_filepath}'. "
                   f"Usando la configuración por defecto completa para 'FS_FEDERATED'.")
                 # Si "FS_FEDERATED" no está, devolvemos el default completo para esta sección.
-                return config
+                return default_config
             
             for key in default_config:
                 if key not in config:
@@ -325,35 +334,51 @@ class ClientApp:
             return
         
         try:
-            local_prob_array_XY = calculate_local_prob_dist_array(
-                self.current_job_data["X_client_discretized"],
-                self.current_job_data["y_client_partition"],
-                self.current_job_data["num_bins_global"],
-                self.current_job_data["num_classes"] 
-            )
+            with Timer("compute_xy") as t_compute:
+                local_prob_array_XY = calculate_local_prob_dist_array(
+                    self.current_job_data["X_client_discretized"],
+                    self.current_job_data["y_client_partition"],
+                    self.current_job_data["num_bins_global"],
+                    self.current_job_data["num_classes"] 
+                )
 
             #Se comprime el resultado para aligerar la carga de la red y del broker MQTT
-            pickled_array = pickle.dumps(local_prob_array_XY)
-            original_size = len(pickled_array)
-            compressed_pickled_array = zlib.compress(pickled_array)
-            compressed_size = len(compressed_pickled_array)
-            print(f"CLIENT_APP [{sim_client_id}]: Tablas P(Xi,Y) - Tamaño Pickled: {original_size} B, Comprimido (zlib): {compressed_size} B (Reducción: {((original_size - compressed_size) / original_size) * 100:.2f}%)")
+            with Timer("comm_xy") as t_comm:
+                pickled_array = pickle.dumps(local_prob_array_XY)
+                original_size = len(pickled_array)
+                compressed_pickled_array = zlib.compress(pickled_array)
+                compressed_size = len(compressed_pickled_array)
+                print(f"CLIENT_APP [{sim_client_id}]: Tablas P(Xi,Y) - Tamaño Pickled: {original_size} B, Comprimido (zlib): {compressed_size} B (Reducción: {((original_size - compressed_size) / original_size) * 100:.2f}%)")
 
-            
-            b64_array_str = base64.b64encode(compressed_pickled_array).decode('utf-8')
-            data_payload = {
+                
+                b64_array_str = base64.b64encode(compressed_pickled_array).decode('utf-8')
+                data_payload = {
+                    "sim_client_id": sim_client_id,
+                    "dataset_name": self.current_job_data["dataset_name"],
+                    "prob_table_type": "XY", 
+                    "pickled_data_base64": b64_array_str,
+                    "is_compressed": True,
+                    "num_samples": len(self.current_job_data["y_client_partition"])
+                }
+                self.communicator.publish(DATA_RESULTS_TOPIC, data_payload, qos=1)
+                self.communicator.publish(STATUS_TOPIC, {"sim_client_id": sim_client_id, "status": "LOCAL_XY_PROB_DIST_PUBLISHED"}, qos=1)
+            bench_payload = {
                 "sim_client_id": sim_client_id,
-                "dataset_name": self.current_job_data["dataset_name"],
-                "prob_table_type": "XY", 
-                "pickled_data_base64": b64_array_str,
-                "is_compressed": True,
-                "num_samples": len(self.current_job_data["y_client_partition"])
+                "phase": "XY",
+                "compute_s": round(t_compute.elapsed, 6),
+                "comm_s": round(t_comm.elapsed, 6),
             }
-            self.communicator.publish(DATA_RESULTS_TOPIC, data_payload, qos=1)
-            self.communicator.publish(STATUS_TOPIC, {"sim_client_id": sim_client_id, "status": "LOCAL_XY_PROB_DIST_PUBLISHED"}, qos=1)
+            self.communicator.publish(BENCH_TOPIC, bench_payload, qos=0)
+            log.info(
+                "[%s] BENCH XY – compute %.3fs | comm %.3fs",
+                sim_client_id,
+                t_compute.elapsed,
+                t_comm.elapsed,
+            )
         except Exception as e_prob:
             error_msg = f"Error calculando/enviando P(Xi,Y) iniciales: {type(e_prob).__name__} - {e_prob}"
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": sim_client_id, "status": "ERROR", "error_message": error_msg}, qos=1)
+        
 
     def process_jmi_batch_triplet_request(self, command_data):
         """
@@ -376,62 +401,73 @@ class ClientApp:
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "ERROR", "error_message": error_msg, "request_id": request_id}, qos=1)
             return
 
-        batch_triplet_results = [] # Lista para almacenar todas las tripletas del batch
-        for k_idx in candidate_k_indices:
-            try:
-                p_xyz_table = calculate_local_triplet_prob_dist(
-                    self.current_job_data["X_client_discretized"],
-                    self.current_job_data["y_client_partition"],
-                    k_idx, fixed_selected_idx,
-                    self.current_job_data["num_bins_global"],
-                    self.current_job_data["num_classes"] # Usar num_classes del job
-                )
-                if p_xyz_table.size == 0 and self.current_job_data["num_bins_global"] > 0:
-                    print(f"[{active_job_id}]: Cálculo de P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id} resultó vacío. Omitiendo este par.")
+        with Timer("compute_jmi_batch") as t_compute:
+            batch_triplet_results = [] # Lista para almacenar todas las tripletas del batch
+            for k_idx in candidate_k_indices:
+                try:
+                    p_xyz_table = calculate_local_triplet_prob_dist(
+                        self.current_job_data["X_client_discretized"],
+                        self.current_job_data["y_client_partition"],
+                        k_idx, fixed_selected_idx,
+                        self.current_job_data["num_bins_global"],
+                        self.current_job_data["num_classes"] # Usar num_classes del job
+                    )
+                    if p_xyz_table.size == 0 and self.current_job_data["num_bins_global"] > 0:
+                        print(f"[{active_job_id}]: Cálculo de P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id} resultó vacío. Omitiendo este par.")
+                        continue
+                    batch_triplet_results.append({
+                        "feature_pair": [k_idx, fixed_selected_idx],
+                        "triplet_table": p_xyz_table
+                    })
+                except Exception as e_jmi_batch_pair:
+                    print(f"[{active_job_id}]: Error calculando P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id}: {e_jmi_batch_pair}. Omitiendo.")
                     continue
-                batch_triplet_results.append({
-                    "feature_pair": [k_idx, fixed_selected_idx],
-                    "triplet_table": p_xyz_table
-                })
-            except Exception as e_jmi_batch_pair:
-                print(f"[{active_job_id}]: Error calculando P(Xk,Xj,Y) para par ({k_idx},{fixed_selected_idx}) en batch {request_id}: {e_jmi_batch_pair}. Omitiendo.")
-                continue
-        
-        if batch_triplet_results:
-            try:
-                #Se comprime el resultado para aligerar la carga de la red y del broker MQTT
-                pickled_batch_data = pickle.dumps(batch_triplet_results)
-                original_size = len(pickled_batch_data)
-                compressed_pickled_data = zlib.compress(pickled_batch_data)
-                compressed_size = len(compressed_pickled_data)
-                print(f"CLIENT_APP [{active_job_id}]: Lote JMI (req: {request_id}) - Tamaño Pickled: {original_size} B, Comprimido (zlib): {compressed_size} B (Reducción: {((original_size - compressed_size) / original_size) * 100:.2f}%)")
+        with Timer("comm_jmi_batch") as t_comm:
+            if batch_triplet_results:
+                try:
+                    #Se comprime el resultado para aligerar la carga de la red y del broker MQTT
+                    pickled_batch_data = pickle.dumps(batch_triplet_results)
+                    original_size = len(pickled_batch_data)
+                    compressed_pickled_data = zlib.compress(pickled_batch_data)
+                    compressed_size = len(compressed_pickled_data)
+                    print(f"CLIENT_APP [{active_job_id}]: Lote JMI (req: {request_id}) - Tamaño Pickled: {original_size} B, Comprimido (zlib): {compressed_size} B (Reducción: {((original_size - compressed_size) / original_size) * 100:.2f}%)")
 
-                b64_batch_data_str = base64.b64encode(compressed_pickled_data).decode('utf-8')
-                jmi_batch_payload = {
-                    "sim_client_id": active_job_id, 
-                    "request_id": request_id,
-                    "prob_table_type": "XkXjY_BATCH", 
-                    "pickled_batch_data_base64": b64_batch_data_str,
-                    "num_triplets_in_payload": len(batch_triplet_results), 
-                    "is_compressed": True,
-                    "num_samples_client": len(self.current_job_data["y_client_partition"])
-                }
-                self.communicator.publish(JMI_PAIR_PROB_RESULTS_TOPIC, jmi_batch_payload, qos=1)
+                    b64_batch_data_str = base64.b64encode(compressed_pickled_data).decode('utf-8')
+                    jmi_batch_payload = {
+                        "sim_client_id": active_job_id, 
+                        "request_id": request_id,
+                        "prob_table_type": "XkXjY_BATCH", 
+                        "pickled_batch_data_base64": b64_batch_data_str,
+                        "num_triplets_in_payload": len(batch_triplet_results), 
+                        "is_compressed": True,
+                        "num_samples_client": len(self.current_job_data["y_client_partition"])
+                    }
+                    self.communicator.publish(JMI_PAIR_PROB_RESULTS_TOPIC, jmi_batch_payload, qos=1)
 
-            except Exception as e_batch_send:
-                error_msg = f"Error serializando/enviando LOTE de tripletas JMI (ID: {request_id}): {type(e_batch_send).__name__} - {e_batch_send}"
-                self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "ERROR", "error_message": error_msg, "request_id": request_id}, qos=1)
-                return
-        else:
-            print(f"[{active_job_id}]: No se generaron tablas de tripletas válidas en el batch {request_id} para enviar.")
-
-        status_payload_jmi_batch_done = {
-            "sim_client_id": active_job_id, 
-            "status": "JMI_BATCH_TRIPLETS_PUBLISHED",
-            "request_id": request_id,
-            "num_triplets_expected_in_batch_from_client": len(batch_triplet_results)
-        }
-        self.communicator.publish(STATUS_TOPIC, status_payload_jmi_batch_done, qos=1)
+                except Exception as e_batch_send:
+                    error_msg = f"Error serializando/enviando LOTE de tripletas JMI (ID: {request_id}): {type(e_batch_send).__name__} - {e_batch_send}"
+                    self.communicator.publish(STATUS_TOPIC, {"sim_client_id": active_job_id, "status": "ERROR", "error_message": error_msg, "request_id": request_id}, qos=1)
+                    return
+            else:
+                print(f"[{active_job_id}]: No se generaron tablas de tripletas válidas en el batch {request_id} para enviar.")
+        try:
+            status_payload_jmi_batch_done = {
+                "sim_client_id": active_job_id, 
+                "status": "JMI_BATCH_TRIPLETS_PUBLISHED",
+                "request_id": request_id,
+                "num_triplets_expected_in_batch_from_client": len(batch_triplet_results)
+            }
+            self.communicator.publish(STATUS_TOPIC, status_payload_jmi_batch_done, qos=1)
+            bench_payload = {
+                "sim_client_id": active_job_id,
+                "phase": f"JMI_batch_{request_id}",
+                "compute_s": round(t_compute.elapsed, 6),
+                "comm_s": round(t_comm.elapsed, 6),
+            }
+            self.communicator.publish(BENCH_TOPIC, bench_payload, qos=0)
+        except Exception as e_bench_send:
+            print("No se enviaron las medidas de tiempos")
+            
         print(f"[{active_job_id}]: Finalizado envío de LOTE JMI (ID: {request_id}). {len(batch_triplet_results)} tablas en lote.")
 
     def stop_save_and_send_emissions(self, emissions_topic):

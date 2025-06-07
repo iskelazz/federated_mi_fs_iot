@@ -46,7 +46,7 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
             print(f"Advertencia: La clave 'FS_FEDERATED' no se encontró en '{config_filepath}'. "
                   f"Usando la configuración por defecto completa para 'FS_FEDERATED'.")
             # Si "FS_FEDERATED" no está, devolvemos el default completo para esta sección.
-            return config
+            return default_config
         for key in default_config:
             if key not in config:
                 config[key] = default_config[key]
@@ -270,12 +270,18 @@ def main():
 
             
     print("Resumen final del estado de los clientes (post-procesamiento):")
-
     global_end_time = time.time()
     total_elapsed_time = global_end_time - global_start_time
-    print(f"---------------------------------------------------------------------")
-    print(f"--- TIEMPO TOTAL DE EJECUCIÓN: {total_elapsed_time:.4f} segundos ---")
-    print(f"---------------------------------------------------------------------")
+    t_compute_max, t_comm_sum = server_handler.get_bench_summary()
+    print("--------------- PERFIL FEDERADO ---------------")
+    print(f"T_compute_cli(mim/jmi) = {t_compute_max:8.2f} s") #Tiempo de calculo tablas en cliente
+    print(f"T_comm(∑)              = {t_comm_sum:8.2f} s") #Tiempo de envio de tablas
+    # El tiempo del servidor lo conoces: total_elapsed_time – max_compute – sum_comm
+    t_server_only = max(0.0, total_elapsed_time - t_compute_max - t_comm_sum)
+    print(f"T_other                = {t_server_only:8.2f} s") #Resto del tiempo
+    print(f"TIEMPO TOTAL           = {total_elapsed_time:8.2f} s")
+    print("-----------------------------------------------")
+
     #Parar trackers de consumo
     server_handler.send_emission_request_to_clients()
     
