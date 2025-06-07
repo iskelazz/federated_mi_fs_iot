@@ -274,6 +274,9 @@ class ClientApp:
         """
         action_from_command = command_data.get("action", "N/A") # Para el log
         current_sim_id_for_log = command_data.get("sim_client_id", self.sim_id) # Usar el ID del comando para el log si está disponible
+        
+        self.pre_timer = Timer("cli_preproc")
+        self.pre_timer.__enter__()
 
         print(f"CLIENT_APP [{current_sim_id_for_log}]: Comando '{action_from_command}' recibido.")
 
@@ -335,6 +338,11 @@ class ClientApp:
         
         try:
             with Timer("compute_xy") as t_compute:
+                if hasattr(self, "pre_timer"):
+                    self.pre_timer.__exit__(None, None, None)
+                    t_pre = self.pre_timer.elapsed
+                else:
+                    t_pre = 0.0
                 local_prob_array_XY = calculate_local_prob_dist_array(
                     self.current_job_data["X_client_discretized"],
                     self.current_job_data["y_client_partition"],
@@ -367,14 +375,9 @@ class ClientApp:
                 "phase": "XY",
                 "compute_s": round(t_compute.elapsed, 6),
                 "comm_s": round(t_comm.elapsed, 6),
+                "pre_s": round(t_pre, 6),
             }
             self.communicator.publish(BENCH_TOPIC, bench_payload, qos=0)
-            log.info(
-                "[%s] BENCH XY – compute %.3fs | comm %.3fs",
-                sim_client_id,
-                t_compute.elapsed,
-                t_comm.elapsed,
-            )
         except Exception as e_prob:
             error_msg = f"Error calculando/enviando P(Xi,Y) iniciales: {type(e_prob).__name__} - {e_prob}"
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": sim_client_id, "status": "ERROR", "error_message": error_msg}, qos=1)

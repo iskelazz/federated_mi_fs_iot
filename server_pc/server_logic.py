@@ -36,6 +36,7 @@ GLOBAL_DISC_PARAMS_TOPIC = "tfg/fl/pi/global_disc_params"
 DATA_RESULTS_TOPIC = "tfg/fl/pi/data_results" 
 JMI_PAIR_PROB_RESULTS_TOPIC = "tfg/fl/pi/jmi_pair_prob"
 EMISSIONS_DATA_TOPIC = "tfg/fl/pi/emissions_data"
+TIMER_DATA_TOPIC = "tfg/fl/pi/bench"
 
 
 class ServerLogic:
@@ -121,16 +122,18 @@ class ServerLogic:
         
         if not cid or comp is None or comm is None:
             return
-        entry = self.bench_per_client.setdefault(cid, {"compute": 0.0, "comm": 0.0})
+        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0})
+        entry["pre"]     += float(bench_json.get("pre_s", 0.0))
         entry["compute"] += float(comp)
         entry["comm"]   += float(comm)
 
     def get_bench_summary(self):
         if not self.bench_per_client:
             return 0.0, 0.0
+        pre_max     = max(d["pre"]     for d in self.bench_per_client.values())
         max_compute = max(d["compute"] for d in self.bench_per_client.values())
         sum_comm    = sum(d["comm"]   for d in self.bench_per_client.values())
-        return max_compute, sum_comm
+        return pre_max, max_compute, sum_comm
     
     
     def add_or_update_active_client(self, sim_client_id, dataset_name):
@@ -630,7 +633,7 @@ class ServerLogic:
                     self.handle_jmi_pair_prob_result(data)
             elif topic == EMISSIONS_DATA_TOPIC:
                 self.emissions_manager.process_client_emission_report(data)
-            elif topic == "tfg/fl/pi/bench":
+            elif topic == TIMER_DATA_TOPIC:
                 self.handle_client_bench_update(data)
         except Exception as e: 
             print(f"Error general procesando mensaje en '{topic}': {type(e).__name__} - {e}.")
@@ -671,8 +674,8 @@ class ServerLogic:
             self.communicator.subscribe(LOCAL_EXTREMES_TOPIC, qos=1)
             self.communicator.subscribe(DATA_RESULTS_TOPIC, qos=1) 
             self.communicator.subscribe(JMI_PAIR_PROB_RESULTS_TOPIC, qos=1) 
-            self.communicator.subscribe(EMISSIONS_DATA_TOPIC, qos=1)
-            self.communicator.subscribe("tfg/fl/pi/bench", qos=0) 
+            self.communicator.subscribe(EMISSIONS_DATA_TOPIC, qos=0)
+            self.communicator.subscribe(TIMER_DATA_TOPIC, qos=0) 
             print(f"Suscrito a topics relevantes.")
 
     def on_disconnected_from_broker(self, rc):
