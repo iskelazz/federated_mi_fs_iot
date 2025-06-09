@@ -1,18 +1,16 @@
 # FEDERATED_MUTUAL_INFORMATION_FS/mqtt_handlers/mqtt_communicator.py
-import logging
 import paho.mqtt.client as mqtt
 import json
 import time
 import numpy as np
 
 class MQTTCommunicator:
-    def __init__(self, broker_address, port, client_id_prefix="mqtt_client", publish_callback=None):
+    def __init__(self, broker_address, port, client_id_prefix="mqtt_client"):
         self.broker_address = broker_address
         self.port = port
         timestamp = time.strftime('%Y%m%d%H%M%S')
         random_num = np.random.randint(1000, 9999)
         self.client_id = f"{client_id_prefix}-{timestamp}-{random_num}"
-        self._pending = {}  # mid -> t0 (perf counter)
         
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=self.client_id)
         self.client.on_connect = self._on_connect
@@ -23,7 +21,7 @@ class MQTTCommunicator:
         self.message_callback = None 
         self.connect_callback = None
         self.disconnect_callback = None 
-        self.publish_callback = publish_callback
+        self.publish_callback = None
         self._subscribed_topics_qos = {}
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
@@ -46,25 +44,9 @@ class MQTTCommunicator:
         if self.disconnect_callback:
             self.disconnect_callback(rc)
 
-    def _on_publish(self, client, userdata, mid, rc, properties=None):
-        tup = self._pending.pop(mid, None)
-        if tup:
-            t0, topic = tup
-            elapsed_ms = (time.perf_counter() - t0)*1e3
-            logging.info(f"[NET] topic={topic!r} mid={mid} {elapsed_ms:.2f} ms")
-
-            # envía métrica de bench al topic ya existente
-            bench = {"sim_client_id": self.client_id,
-                     "net_s": elapsed_ms / 1_000}  # seg
-            self.client.publish("tfg/fl/pi/bench", json.dumps(bench), qos=0)
-
-        # Deja que externos se enganchen, si los hay
+    def _on_publish(self, client, userdata, mid, rc=None, properties=None):
         if self.publish_callback:
-            self.publish_callback(mid, rc)
-
-#    def _on_publish(self, client, userdata, mid, rc=None, properties=None):
-#        if self.publish_callback:
-#            self.publish_callback(mid)
+            self.publish_callback(mid)
 
     def set_message_callback(self, callback): self.message_callback = callback
     def set_connect_callback(self, callback): self.connect_callback = callback
@@ -93,31 +75,25 @@ class MQTTCommunicator:
         self.client.disconnect() # Solicita la desconexión al broker
         print(f"MQTTComm [{self.client_id}]: Llamada a client.disconnect() completada.")
 
-   # def publish(self, topic, payload_data, qos=0, retain=False):
-   #     """
-   #         Publica un mensaje en el topic especificado. Convierte automáticamente diccionarios y listas a formato JSON string antes de enviar.  Admite payloads de tipo string, bytes o los convierte a string. Devuelve el resultado de la publicación de Paho-MQTT o None en caso de error.
-   #     """
-   #     payload_to_send = None
-   #     if isinstance(payload_data, (dict, list)):
-   #         payload_to_send = json.dumps(payload_data)
-   #     elif isinstance(payload_data, str):
-   #         payload_to_send = payload_data
-   #     elif isinstance(payload_data, bytes):
-   #         payload_to_send = payload_data
-   #     else:
-   #         payload_to_send = str(payload_data)
+    def publish(self, topic, payload_data, qos=0, retain=False):
+        """
+            Publica un mensaje en el topic especificado. Convierte automáticamente diccionarios y listas a formato JSON string antes de enviar.  Admite payloads de tipo string, bytes o los convierte a string. Devuelve el resultado de la publicación de Paho-MQTT o None en caso de error.
+        """
+        payload_to_send = None
+        if isinstance(payload_data, (dict, list)):
+            payload_to_send = json.dumps(payload_data)
+        elif isinstance(payload_data, str):
+            payload_to_send = payload_data
+        elif isinstance(payload_data, bytes):
+            payload_to_send = payload_data
+        else:
+            payload_to_send = str(payload_data)
         
-   #     try:
-   #         return self.client.publish(topic, payload_to_send, qos=qos, retain=retain)
-   #     except Exception as e:
-   #         print(f"MQTTComm [{self.client_id}]: ERROR publicando en '{topic}': {e}")
-   #         return None
-        
-    def publish(self, topic: str, payload: dict, qos: int = 1):
-        t0 = time.perf_counter()
-        info = self.client.publish(topic, json.dumps(payload), qos=qos)
-        self._pending[info.mid] = (t0, topic)          # guardamos arranque
-        return info   
+        try:
+            return self.client.publish(topic, payload_to_send, qos=qos, retain=retain)
+        except Exception as e:
+            print(f"MQTTComm [{self.client_id}]: ERROR publicando en '{topic}': {e}")
+            return None
 
     def subscribe(self, topic, qos=0):
         self.client.subscribe(topic, qos=qos)

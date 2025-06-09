@@ -273,12 +273,10 @@ def main():
     global_end_time = time.time()
     total_elapsed_time = global_end_time - global_start_time
     t_pre_max, t_compute_max, t_comm_sum = server_handler.get_bench_summary()
-    avg_net_ms = server_handler.get_avg_net_latency_ms()
     print("--------------- PERFIL FEDERADO ---------------")
     print(f"T_preprocessed(max)    = {t_pre_max:8.2f} s")   # min/max + discretización
     print(f"T_compute_cli(mim/jmi) = {t_compute_max:8.2f} s") #Tiempo de calculo tablas en cliente
     print(f"T_comm(∑)              = {t_comm_sum:8.2f} s") #Tiempo de envio de tablas
-    print(f"Net (RTT) ⌀: {avg_net_ms:.1f} ms")
     # El tiempo del servidor lo conoces: total_elapsed_time – max_compute – sum_comm
     t_server_only = max(0.0, total_elapsed_time - t_compute_max - t_comm_sum - t_pre_max)
     print(f"T_server                = {t_server_only:8.2f} s") #Trabajo en servidor
