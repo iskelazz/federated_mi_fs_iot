@@ -1,6 +1,6 @@
 {
     "FS_FEDERATED": {
-        "DATASET_TO_LOAD_GLOBALLY": "gisette",
+        "DATASET_TO_LOAD_GLOBALLY": "arcene",
         "MI_FS_METHOD": "JMI",
         "NUM_SIMULATED_CLIENTS_TOTAL": 2,
         "DISTRIBUTION_TYPE": "iid",
@@ -21,12 +21,12 @@
         "MI_FS_METHOD": "JMI"
     },
     "CLASSIFIER": {
-        "DATASET_NAME": "mnist",
-        "CLASSIFIER_CHOICE": "KNN",
+        "DATASET_NAME": "madelon",
+        "CLASSIFIER_CHOICE": "RF",
         "TEST_SPLIT_RATIO":0.3,
         "SCALE_FEATURES": true,
-        "USE_ALL_FEATURES": true,
-        "ITERATIONS": 5,
-        "FILE_NAME_FS": "mnist_federated_selected_top75_JMI_federated_feature_indices.txt"
+        "USE_ALL_FEATURES": false,
+        "ITERATIONS": 7,
+        "FILE_NAME_FS": "three_clients/madelon_federated_selected_top75_JMI_federated_feature_indices_noniid.txt"
     }
 }

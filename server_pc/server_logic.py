@@ -114,18 +114,45 @@ class ServerLogic:
 
         print(f"Nueva ronda inicializada. Esperando {self.expected_clients_in_round} clientes. Método: {self.mi_method}, TopK: {self.top_k_features}")
 
-
     def handle_client_bench_update(self, bench_json):
         cid = bench_json.get("sim_client_id")
-        comp = bench_json.get("compute_s")
-        comm = bench_json.get("comm_s")
-        
-        if not cid or comp is None or comm is None:
+        if not cid:
             return
-        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0})
-        entry["pre"]     += float(bench_json.get("pre_s", 0.0))
-        entry["compute"] += float(comp)
-        entry["comm"]   += float(comm)
+
+        entry = self.bench_per_client.setdefault(
+            cid,
+            {"pre": 0.0, "compute": 0.0, "comm": 0.0, "net_sum": 0.0, "net_cnt": 0},
+        )
+
+        if "pre_s"     in bench_json: entry["pre"]     += float(bench_json["pre_s"])
+        if "compute_s" in bench_json: entry["compute"] += float(bench_json["compute_s"])
+        if "comm_s"    in bench_json: entry["comm"]    += float(bench_json["comm_s"])
+
+        # ← nuevo: acumula la latencia
+        if "net_s" in bench_json:
+            entry["net_sum"] += float(bench_json["net_s"])
+            entry["net_cnt"] += 1
+
+    #def handle_client_bench_update(self, bench_json):
+    #    cid = bench_json.get("sim_client_id")
+    #    comp = bench_json.get("compute_s")
+    #    comm = bench_json.get("comm_s")
+    #    
+    #    if not cid or comp is None or comm is None:
+    #        return
+    #    entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0})
+    #    entry["pre"]     += float(bench_json.get("pre_s", 0.0))
+    #    entry["compute"] += float(comp)
+    #    entry["comm"]   += float(comm)
+    
+    
+    def get_avg_net_latency_ms(self):
+        total_net = total_cnt = 0
+        for d in self.bench_per_client.values():
+            total_net += d.get("net_sum", 0.0)
+            total_cnt += d.get("net_cnt", 0)
+        return (total_net / total_cnt) * 1000.0 if total_cnt else 0.0
+
 
     def get_bench_summary(self):
         if not self.bench_per_client:

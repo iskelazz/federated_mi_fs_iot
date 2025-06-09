@@ -58,4 +58,3 @@ def calculate_local_triplet_prob_dist(X_client_discretized, y_client_partition, 
     except Exception as e:
         print(f"[{sim_client_id_for_log}]: Excepción en histogramdd para par ({k_idx},{j_idx}): {e}")
         return np.zeros((num_bins, num_bins, num_classes), dtype=float)
-
