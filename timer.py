@@ -9,5 +9,5 @@ class Timer:
         return self
     def __exit__(self, *exc):
         elapsed = time.perf_counter() - self.t0
-        logging.info(f'[TIME] {self.tag}: {elapsed:.3f}s')
+        #logging.info(f'[TIME] {self.tag}: {elapsed:.3f}s')
         self.elapsed = elapsed

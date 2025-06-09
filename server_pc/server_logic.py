@@ -50,7 +50,6 @@ class ServerLogic:
         self.aggregation_method = "simple"
         self.global_num_bins = 5 
         self.expected_clients_in_round = 0
-
         # Colecciones de datos de la ronda
         self.collected_local_extremes = {}
         self.clients_reported_extremes_count = 0
@@ -124,7 +123,7 @@ class ServerLogic:
         
         if not cid or comp is None or comm is None:
             return
-        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0})
+        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0, "queue": 0.0})
         entry["pre"]     += float(bench_json.get("pre_s", 0.0))
         entry["compute"] += float(comp)
         entry["comm"]   += float(comm)
@@ -138,7 +137,7 @@ class ServerLogic:
             return 0.0, 0.0, 0.0
         pre_max     = max(d["pre"]     for d in self.bench_per_client.values())
         max_compute = max(d["compute"] for d in self.bench_per_client.values())
-        sum_comm    = sum(d["comm"]   for d in self.bench_per_client.values())
+        sum_comm    = max(d["comm"]   for d in self.bench_per_client.values())
         return pre_max, max_compute, sum_comm
     
     

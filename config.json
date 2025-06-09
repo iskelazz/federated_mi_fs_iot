@@ -1,9 +1,9 @@
 {
     "FS_FEDERATED": {
-        "DATASET_TO_LOAD_GLOBALLY": "arcene",
-        "MI_FS_METHOD": "JMI",
+        "DATASET_TO_LOAD_GLOBALLY": "mnist",
+        "MI_FS_METHOD": "MIM",
         "NUM_SIMULATED_CLIENTS_TOTAL": 2,
-        "DISTRIBUTION_TYPE": "iid",
+        "DISTRIBUTION_TYPE": "non-iid",
         "NUM_BINS": 5,
         "TOP_K_FEATURES_TO_SELECT": 75,
         "TIMEOUT_SECONDS_OVERALL": 600,
