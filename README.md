@@ -14,7 +14,7 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
   Carpeta que integra la lógica que va utilizar el cliente (Raspberry Pi 5). Está compuesto por:
 
   - **ClientApp**
-  Archivo: [`client_app.py`]
+  Archivo: [`client_app.py`](client_pi/client_app.py)
     - Es el núcleo del cliente, se encarga de gestionar las operaciones que le corresponden. 
     - Gestión de operaciones MQTT (`_setup_mqtt_callbacks`, `start`, `cleanup`, `on_connected`, `on_disconnected`, `on_message_received`)
     - Reseteo de estado del cliente (`_initialize_job_state`, `_reset_current_job`)
@@ -28,7 +28,7 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
     - `stop_save_and_send_emissions(self, emissions_topic)`: Para el tracker de emisiones, extrae los resultados y los envía al servidor.
 
   - **ClientEmissionsManager**
-  Archivo: [`client_emissions_manager.py`]
+  Archivo: [`client_emissions_manager.py`](client_pi/client_emissions_manager.py)
     - Gestiona las operaciones del tacker de emisiones.
     - `start_tracking(self)`: Inicia el tracker.
     - `stop_tracking_and_get_data(self, log_id)`: Detiene el tracker y devuelve la información recolectada en el proceso (duración de trackeo, energía consumida y CO2 emitido).
@@ -37,14 +37,14 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
   
 
   - **client_utils**
-  Archivo: [`clients_utils.py`]
+  Archivo: [`clients_utils.py`](client_pi/client_utils.py)
     - `calculate_local_prob_dist_array(X_discretized, y_labels, num_bins, num_classes, sim_client_id_for_log="N/A_CLIENT")`: Calcula P(Xi, Y) usando np.histogram2d.
     - `calculate_local_triplet_prob_dist(X_client_discretized, y_client_partition, k_idx, j_idx, num_bins, num_classes, sim_client_id_for_log="N/A_CLIENT")`:  "Calcula P_l(X_k, X_j, Y) usando np.histogramdd.
 
   ## /mqtt_handlers
 
   - **MQTTCommunicator**
-  Archivo: [`mqtt_communicator.py`]
+  Archivo: [`mqtt_communicator.py`](mqtt_handlers/mqtt_communicator.py)
     - Clase envoltorio que tiene el objetivo de simplificar las funciones de comunicación usando el protocolo MQTT.
     - Gestión de la comunicación (`_on_connect`, `_on_message`, `_on_disconnect`, `_on_publish`) 
     - Callbacks (`set_message_callback`, `set_connect_callback`, `set_disconnect_callback`, `set_publish_callback`)
@@ -58,29 +58,29 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
   Carpeta que integra la lógica del servidor. Compuesto por:
 
   - **ClientSimState**
-  Archivo [`client_sim_state.py`]
+  Archivo [`client_sim_state.py`](server_pc/client_sim_state.py)
     - Almacena en el servidor el estado de un cliente específico.
 
   - **feature_selector**
-  Archivo [`feature_selector.py`]
+  Archivo [`feature_selector.py`](server_pc/feature_selector.py)
     - `calculate_mi_for_feature(p_XY_2D_table)`: Calcula la Información Mutua I(X;Y) para una característica X y la clase Y.
     - `select_features_mim(p_XY_data_array_3D, top_k=15)`: Realiza la selección de características utilizando el método MIM.
     - `calculate_mi_for_triplet(p_XkXjY_table_3D)`:  Calcula la Información Mutua I( (Xk,Xj); Y ) para un par de características (Xk,Xj) y la clase Y.
   
   - **JMIOrchestrator**
-  Archivo [´jmi_orchestrator.py´]
+  Archivo [´jmi_orchestrator.py´](server_pc/jmi_orchestrator.py)
     - Dirige el algoritmo de selección de características JMI en el entorno federado. Opera en su propio hilo.
     - `__init__((self, comm_instance, active_clients_dict, num_expected_clients, global_lock, aggregate_func_ref,dataset_name_for_save,save_function_ref))`: Recibe y almacena referencias a la instancia de comunicación MQTT, el diccionario de clientes activos, el número esperado de clientes, un bloqueo global para concurrencia, la función de agregación de tablas de probabilidad, el nombre del dataset y la función para guardar las características seleccionadas.
     - `_initialize_first_feature(self)`: Inicia el algoritmo JMI seleccionando la primera característica con MIM.
     - `start_selection(self, aggregated_XY_tables, top_k_to_select)`: Función que gestiona de forma completa el loop JMI hasta tener el conjunto de características. En cada iteración realiza las peticiones al cliente y espera a recibir el resultado de todos ellos para seleccionar una nueva característica.
   
   - **server_app**
-  Archivo [`server_app.py`] 
+  Archivo [`server_app.py`](server_pc/server_app.py)
     - Se encarga de gestionar el hilo principal del servidor, recibe los datos de configuración de la selección de características y los gestiona, tambien gestiona el bucle principal y da conclusión al proceso.
     - Carga de configuración de config.json (`_load_simulation_config`).
     - `generate_and_display_label_dispersion(config,unique_global_labels,num_total_clients,client_data_indices_map,global_labels_array,dataset_name_global,distribution_type_global)`: Crea un gráfico para poder visualizar la dispersión de los datos entre los clientes.
   - **ServerEmissionsManager**
-  Archivo [`server_emissions_manager.py`]
+  Archivo [`server_emissions_manager.py`](server_pc/server_emissions_manager.py)
     - Se encarga del soporte a las operaciones con codecarbon para estimar el consumo del proceso de selección de características asi como su emisión de gases de CO2.
     - `__init__(self, project_root_path, server_id_for_log = "server")`: Función para construir un objeto ServerEmissionsManager.
     - `set_dependencies(self, communicator, lock, active_clients_ref)`: Función para inyectar las dependencias más importantes desde server_logic, el comunicador MQTT, lock para bloquear los hilos y active_clients_ref para conocer el número de clientes.
@@ -93,10 +93,12 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
     - `check_and_print_aggregated_emissions(self)`: Comprueba si todos los clientes reportaron sus datos de emisiones y consumo; en caso afirmativo, imprime por pantalla los datos combinados de todos los clientes y el servidor.
 
   - **ServerLogic**
-  Archivo [server_logic.py]
+  Archivo [server_logic.py](server_pc/server_logic.py)
     - Es el núcleo lógico del programa. Se encarga de inicializar el proceso, capturar y enviar todas las comunicaciones con los clientes, guía los procesos de cálculo de máximos/mínimos globales y de selección de características, tanto MIM como JMI. Gestiona ClientSimState, JMIOrchestrator y ServerEmissionsManager.
     - `set_communicator(self, comm_instance: MQTTCommunicator)`: Función para inyectar comunicador MQTT.
     - `initialize_new_round(self, num_clients_expected_param)`: Inicializa una nueva ronda; se ejecuta con una vez en server_app al inicializar el programa.
+    - `handle_client_bench_update(self, bench_json)`: Almacena los datos de tiempos tomados del cliente.
+    - `get_bench_summary(self)`: Devuelve los datos de tiempos tomados del cliente.
     - `add_or_update_active_client(self, sim_client_id, dataset_name)`: Añade un nuevo cliente o actualiza uno existente para la ronda.
     - `send_processing_command_to_pi(self, sim_client_id, dataset_name, indices_list, num_global_classes_param)`: Comunicación inicial con los dispositivos del borde; se envía la parte del dataset que manejan, llamado una vez en server_app inicia el bucle de comunicación.
     - `_process_and_dispatch_global_parameters(self)`: Tras recibir los máx./mín. locales de todos los clientes, esta función calcula los máx./mín. globales y los envía a los dispositivos del borde de la red.
@@ -117,14 +119,14 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
   Proceso de selección de características centralizado, su objetivo es proporcionar datos para la comparación con el algoritmo federado.
 
   - **mutual_information**
-  Archivo [mutual_information.py]
+  Archivo [mutual_information.py](centralized/mutual_information.py)
     - Contiene los algoritmos de selección mutua.
     - `mi(X, Y)`: Información mutua entre una característica y sus etiquetas. 
     - `MIM(X_data, Y_labels, topK)`: Selecciona topK características usando el algoritmo de información mutua MIM.
     - `JMI(X_data, Y_labels, topK)`: Selecciona topK características usando el algoritmo de información mutua JMI.
 
   - **feature_selection_centralized**
-  Archivo [feature_selection_centralized.py]
+  Archivo [feature_selection_centralized.py](centralized/feature_selection_centralized.py)
     - Script que da uso a los algoritmos de selección mutua de mutual_information.py 
     Contiene la configuración del proceso en constantes en las primeras líneas del archivo. Contiene las siguientes funciones auxiliares.
     - `load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization)`: Carga el dataset, asegura la forma correcta de X y lo discretiza.

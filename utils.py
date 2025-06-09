@@ -136,13 +136,7 @@ def discretize_equalwidth(X, bins, feature_ranges = None):
 
 
 def calculate_uneven_quotas(total_samples, num_users, unevenness_factor):
-    """
-    Calcula cuotas de muestras (enteros) para cada usuario de forma desbalanceada,
-    asegurando que la suma de las cuotas sea igual a total_samples.
-    """
-
-    if not (0.0 <= unevenness_factor < 1.0):
-         raise ValueError("unevenness_factor debe estar en el rango [0.0, 1.0).")
+    
 
     if unevenness_factor == 0.0 or num_users == 1:
         base_quota = total_samples // num_users

@@ -115,6 +115,9 @@ class ServerLogic:
         print(f"Nueva ronda inicializada. Esperando {self.expected_clients_in_round} clientes. Método: {self.mi_method}, TopK: {self.top_k_features}")
 
     def handle_client_bench_update(self, bench_json):
+        """
+            Almacena los datos de tiempos tomados del cliente.
+        """
         cid = bench_json.get("sim_client_id")
         comp = bench_json.get("compute_s")
         comm = bench_json.get("comm_s")
@@ -128,8 +131,11 @@ class ServerLogic:
     
 
     def get_bench_summary(self):
+        """
+            Devuelve los datos de tiempos tomados del cliente.
+        """
         if not self.bench_per_client:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0
         pre_max     = max(d["pre"]     for d in self.bench_per_client.values())
         max_compute = max(d["compute"] for d in self.bench_per_client.values())
         sum_comm    = sum(d["comm"]   for d in self.bench_per_client.values())
