@@ -322,4 +322,11 @@ Los datasets están localizados en la ruta `datasets/<name>/`, las rutas están 
   - `datasets/MNIST_et.mat`  
   - `datasets/humanActivity.mat`
 
+- **Caso Opportunity**:
+  - Dataset muy pesado, no incluido en /datasets, para descargarlo ya preprocesado, ejecutar el script /datasets/opportunityUCI.py
+  - Preprocesado: Se eliminan muestras con clase nula, y caracteristicas con más de 50% de sus celdas nulas, se aplica mediana al resto de nulos.
+```bash
+  python3 .\opportunityUCI.py
+  ```
+
 Nombres permitidos `load_dataset()`: `"mnist"`, `"human"`, `"gisette"`, `"arcene"`, `"madelon"`, `"gas_sensor"`, `"internet_ads"`, `opportunity`.
