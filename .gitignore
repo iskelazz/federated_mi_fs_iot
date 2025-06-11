@@ -29,6 +29,7 @@ MANIFEST
 #folders
 /emissions_output/*
 /selected_features
+/datasets/opportunity.mat
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

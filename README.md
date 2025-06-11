@@ -194,7 +194,8 @@ Archivo: [`utils.py`](utils.py)
         "PORT": 1883,
         "AGGREGATION_METHOD": "simple",
         "UNEVENNESS_FACTOR_NONIID": 0.0,
-        "PLOT_DISPERSION": false
+        "PLOT_DISPERSION": false,
+        "OPPORTUNITY_CROSS_SILO": true 
     },
     "FS_CENTRALIZED":{
         "DATASET_TO_LOAD_GLOBALLY": "arcene",
@@ -230,6 +231,7 @@ Archivo: [`utils.py`](utils.py)
   - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
   - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid, el valor de este factor es un float entre 0 y 1 determina el desbalanceo de muestras entre los clientes, siendo 0 un número identico de muestras entre los clientes y 1 un fuerte desbalanceo.
   - `PLOT_DISPERSION`: Si es true, devuelve un gráfico de barras apiladas que representa la dispersión del dataset entre los clientes.
+  - `OPPORTUNITY_CROSS_SILO`: Si es true, el dataset es "opportunity" y el número de clientes = 4, aplica división por sujeto, ignorara el valor de DISTRIBUTION_TYPE y UNEVENNESS_FACTOR_NONIID
 
   ## FS_CENTRALIZED
   Configuración necesaria para el proceso de selección de caracteristicas centralizado.
@@ -320,4 +322,4 @@ Los datasets están localizados en la ruta `datasets/<name>/`, las rutas están 
   - `datasets/MNIST_et.mat`  
   - `datasets/humanActivity.mat`
 
-Nombres permitidos `load_dataset()`: `"mnist"`, `"human"`, `"gisette"`, `"arcene"`, `"madelon"`, `"gas_sensor"`, `"internet_ads"`.
+Nombres permitidos `load_dataset()`: `"mnist"`, `"human"`, `"gisette"`, `"arcene"`, `"madelon"`, `"gas_sensor"`, `"internet_ads"`, `opportunity`.

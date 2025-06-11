@@ -14,7 +14,7 @@ try:
     from mqtt_handlers.mqtt_communicator import MQTTCommunicator
     from server_logic import ServerLogic 
     from server_logic import SERVER_ID_PREFIX_PC
-    from utils import load_dataset, build_iid_data, build_noniid_data, build_noniid_uneven_no_loss, plot_label_dispersion_matplotlib_only
+    from utils import load_dataset, build_iid_data, build_noniid_data, build_noniid_uneven_no_loss, plot_label_dispersion_matplotlib_only, build_by_subject
 except ImportError as e:
     print(f"ERROR crítico importando módulos: {e}. Verifique PYTHONPATH.")
     sys.exit(1)
@@ -35,7 +35,8 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
         "PORT": 1883,
         "AGGREGATION_METHOD": "simple",
         "UNEVENNESS_FACTOR_NONIID": 0.0,
-        "PLOT_DISPERSION": "False"
+        "PLOT_DISPERSION": "false",
+        "OPPORTUNITY_CROSS_SILO": "false"
     }
     try:
         with open(config_filepath, 'r') as f:
@@ -123,6 +124,7 @@ def main():
     PORT = config["PORT"]
     AGGREGATION_METHOD = config["AGGREGATION_METHOD"]
     UNEVENNESS_FACTOR_NONIID = config["UNEVENNESS_FACTOR_NONIID"]
+    OPPORTUNITY_CROSS_SILO = config["OPPORTUNITY_CROSS_SILO"]
     
     server_handler = ServerLogic(PROJECT_ROOT_ORCH)
     # --- Inicialización del Comunicador MQTT ---
@@ -148,7 +150,7 @@ def main():
     # --- Carga de Dataset y Distribución ---
     print(f"Cargando dataset global '{DATASET_TO_LOAD_GLOBALLY}'...")
     try:
-        X_global, y_global = load_dataset(DATASET_TO_LOAD_GLOBALLY)
+        X_global, y_global, subj_global = load_dataset(DATASET_TO_LOAD_GLOBALLY)
         print(f"Dataset '{DATASET_TO_LOAD_GLOBALLY}' cargado. X:{X_global.shape}, Y:{y_global.shape}")
     except Exception as e_load:
         print(f"ERROR cargando dataset: {e_load}"); communicator.disconnect(); sys.exit(1)
@@ -157,8 +159,10 @@ def main():
     unique_global_labels = np.unique(y_global)
     NUM_GLOBAL_CLASSES = len(unique_global_labels)
     user_indices_map = None
-
-    if DISTRIBUTION_TYPE == "iid": user_indices_map = build_iid_data(y_global, NUM_SIMULATED_CLIENTS_TOTAL)
+    if NUM_SIMULATED_CLIENTS_TOTAL == 4 and DATASET_TO_LOAD_GLOBALLY == "opportunity" and OPPORTUNITY_CROSS_SILO == True:
+        
+        user_indices_map = build_by_subject(subj_global)
+    elif DISTRIBUTION_TYPE == "iid": user_indices_map = build_iid_data(y_global, NUM_SIMULATED_CLIENTS_TOTAL)
     elif DISTRIBUTION_TYPE == "non-iid": 
         if (UNEVENNESS_FACTOR_NONIID>0):
             user_indices_map = build_noniid_uneven_no_loss(y_global, NUM_SIMULATED_CLIENTS_TOTAL, UNEVENNESS_FACTOR_NONIID)

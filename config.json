@@ -1,9 +1,9 @@
 {
     "FS_FEDERATED": {
-        "DATASET_TO_LOAD_GLOBALLY": "mnist",
+        "DATASET_TO_LOAD_GLOBALLY": "opportunity",
         "MI_FS_METHOD": "JMI",
-        "NUM_SIMULATED_CLIENTS_TOTAL": 1,
-        "DISTRIBUTION_TYPE": "non-iid",
+        "NUM_SIMULATED_CLIENTS_TOTAL": 4,
+        "DISTRIBUTION_TYPE": "iid",
         "NUM_BINS": 5,
         "TOP_K_FEATURES_TO_SELECT": 75,
         "TIMEOUT_SECONDS_OVERALL": 600,
@@ -12,7 +12,8 @@
         "PORT": 1883,
         "AGGREGATION_METHOD": "simple",
         "UNEVENNESS_FACTOR_NONIID": 0.0,
-        "PLOT_DISPERSION": false
+        "PLOT_DISPERSION": true,
+        "OPPORTUNITY_CROSS_SILO": true 
     },
     "FS_CENTRALIZED":{
         "DATASET_TO_LOAD_GLOBALLY": "arcene",
@@ -21,12 +22,12 @@
         "MI_FS_METHOD": "JMI"
     },
     "CLASSIFIER": {
-        "DATASET_NAME": "madelon",
+        "DATASET_NAME": "opportunity",
         "CLASSIFIER_CHOICE": "RF",
         "TEST_SPLIT_RATIO":0.3,
         "SCALE_FEATURES": true,
         "USE_ALL_FEATURES": false,
         "ITERATIONS": 7,
-        "FILE_NAME_FS": "three_clients/madelon_federated_selected_top75_JMI_federated_feature_indices_noniid.txt"
+        "FILE_NAME_FS": "opportunity_federated_selected_top75_JMI_federated_feature_indices.txt"
     }
 }

@@ -214,7 +214,7 @@ class ClientApp:
         
 
         try:
-            X_global, y_global = load_dataset(self.current_job_data["dataset_name"])
+            X_global, y_global, _ = load_dataset(self.current_job_data["dataset_name"])
             self.current_job_data["X_client_partition"] = X_global[client_indices, :]
             self.current_job_data["y_client_partition"] = y_global[client_indices]
 

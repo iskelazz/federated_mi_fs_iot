@@ -36,7 +36,7 @@ def load_dataset_bin(name):
     y = np.concatenate((info['train']['label'], info['validation']['label']))
     _, _, y = np.unique(y, return_index=True,return_inverse=True)
 
-    return (X, y)
+    return (X, y, None)
 
 def load_dataset_mat(name): 
     file_path = os.path.join(PROJECT_ROOT, 'datasets', name + '.mat')
@@ -44,7 +44,18 @@ def load_dataset_mat(name):
     X = np.float32(data["data"])
     y = np.float32(data["labels"]).ravel() 
     _, _, y = np.unique(y, return_index=True,return_inverse=True)
-    return (X, y)
+    return (X, y, None)
+
+def load_opportunity(return_subjects = False):
+    file_path = os.path.join(PROJECT_ROOT, 'datasets', 'opportunity' + '.mat')
+    mat = sp.loadmat(file_path)
+    X = mat["data"].astype(np.float32)
+    y = mat["labels"].ravel().astype(np.int16)
+    subjects = mat["subjects"].ravel().astype(np.int8)
+
+    if return_subjects:
+        return (X, y, subjects)
+    return (X, y, None)
 
 def load_dataset(dataset_name):
     if dataset_name == "mnist":
@@ -55,6 +66,8 @@ def load_dataset(dataset_name):
         data_tuple = load_dataset_mat("humanActivity")
     elif dataset_name == "gas_sensor":
         data_tuple = load_dataset_mat("gas_sensor")
+    elif dataset_name == "opportunity":
+        data_tuple = load_opportunity(return_subjects=True)
     elif dataset_name == "gisette":
         data_tuple = load_dataset_bin("gisette")
     elif dataset_name == "arcene":
@@ -94,6 +107,13 @@ def build_noniid_data(dataset, labels, num_users):
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
         dict_users[i]  = list(dict_users[i].astype('int'))
     return dict_users
+
+
+def build_by_subject(subject_ids):
+    mapping = {}
+    for client_idx, subj in enumerate(sorted(np.unique(subject_ids))):
+        mapping[client_idx] = np.where(subject_ids == subj)[0].tolist()
+    return mapping
 
 def partition(X, y, users):
     data = []
