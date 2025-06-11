@@ -271,11 +271,14 @@ def main():
             
     print("Resumen final del estado de los clientes (post-procesamiento):")
     global_end_time = time.time()
-    total_elapsed_time = global_end_time - global_start_time
+    t_load_max, t_pre_max, t_compute_max, t_comm_sum = server_handler.get_bench_summary()
+    total_elapsed_time = global_end_time - global_start_time - t_load_max
     summary = None
     if (MI_FS_METHOD == "JMI"): summary = server_handler.current_jmi_orchestrator.get_server_timing_summary()
-    t_pre_max, t_compute_max, t_comm_sum = server_handler.get_bench_summary()
+    
     print("--------------- PERFIL FEDERADO ---------------")
+    print(f"T_load_dataset(max)    = {t_load_max:8.2f} s")   # tiempo de carga del dataset en cliente
+    print("-----------------------------------------------")
     print(f"T_preprocessed(max)    = {t_pre_max:8.2f} s")   # min/max + discretización
     print(f"T_compute_cli(mim/jmi) = {t_compute_max:8.2f} s") #Tiempo de calculo tablas en cliente
     print(f"T_comm(∑)              = {t_comm_sum:8.2f} s") #Tiempo de envio de tablas
@@ -283,7 +286,7 @@ def main():
     if summary is not None:
         print(f"T_agg_total            = {summary['T_agg_total']:8.2f} s")
         print(f"T_mi_cal_server        = {summary['T_mi_calc_total']:8.2f} s")
-        t_others =- summary['T_agg_total'] + summary['T_mi_calc_total']
+        t_others =  t_others - (summary['T_agg_total'] + summary['T_mi_calc_total'])
     
     print(f"T_others               = {t_others:8.2f} s") #Comunicacion + otros procesos de gestion
     print(f"TIEMPO TOTAL           = {total_elapsed_time:8.2f} s")

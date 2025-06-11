@@ -75,8 +75,8 @@ class JMIOrchestrator:
             self.Q_candidate_indices = list(range(num_total_features))
             self.S_selected_indices = [] 
             self.triplet_cache.clear()
-
-        self._initialize_first_feature()
+        with self.lock:
+            self._initialize_first_feature()
 
         while len(self.S_selected_indices) < top_k_to_select and self.Q_candidate_indices:
             iter_num_for_log = len(self.S_selected_indices)

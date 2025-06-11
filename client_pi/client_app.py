@@ -211,12 +211,7 @@ class ClientApp:
 
         client_output_dir = os.path.join(PROJECT_ROOT, "emissions_output", self.sim_id) # Carpeta por cliente
         os.makedirs(client_output_dir, exist_ok=True)
-        self.tracker = ClientEmissionsManager( # Aquí usas ClientEmissionsManager
-            project_name=f"client_job_{log_id}_{self.current_job_data['dataset_name']}", # Nombre de proyecto más específico
-            output_dir=client_output_dir,
-        )
-        self.tracker.start_tracking()
-        print(f"CLIENT_APP [{log_id}]: EmissionsTracker iniciado para job '{log_id}'.")
+        
 
         try:
             X_global, y_global = load_dataset(self.current_job_data["dataset_name"])
@@ -232,6 +227,14 @@ class ClientApp:
             
             print(f"CLIENT_APP [{log_id}]: Partición cargada. X_shape: {self.current_job_data['X_client_partition'].shape}, "
                   f"y_shape: {self.current_job_data['y_client_partition'].shape}, Num Clases (job): {self.current_job_data['num_classes']}")
+            
+            #Iniciar tracker despues de la carga de datos para no medir procesos artificiales para nuestro trabajo
+            self.tracker = ClientEmissionsManager( # Aquí usas ClientEmissionsManager
+            project_name=f"client_job_{log_id}_{self.current_job_data['dataset_name']}", # Nombre de proyecto más específico
+            output_dir=client_output_dir,
+            )
+            self.tracker.start_tracking()
+            print(f"CLIENT_APP [{log_id}]: EmissionsTracker iniciado para job '{log_id}'.")
             return True # Configuración y carga de datos exitosa
 
         except Exception as e_load:
@@ -275,14 +278,17 @@ class ClientApp:
         action_from_command = command_data.get("action", "N/A") # Para el log
         current_sim_id_for_log = command_data.get("sim_client_id", self.sim_id) # Usar el ID del comando para el log si está disponible
         
-        self.pre_timer = Timer("cli_preproc")
-        self.pre_timer.__enter__()
 
         print(f"CLIENT_APP [{current_sim_id_for_log}]: Comando '{action_from_command}' recibido.")
-
+        self.load_dts = Timer("load_dataset")
+        self.load_dts.__enter__()
         if self._setup_job_and_load_data(command_data):
             log_id = self.current_job_data["sim_client_id"]
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "RECEIVED_COMMAND_AND_INDICES"}, qos=1)
+            
+            self.load_dts.__exit__(None, None, None)
+            self.pre_timer = Timer("cli_preproc")
+            self.pre_timer.__enter__()
             self._calculate_and_send_local_extremes()
         else:
             # El error ya fue logueado y el tracker (si se inició) manejado por _setup_job_and_load_data
@@ -343,6 +349,10 @@ class ClientApp:
                     t_pre = self.pre_timer.elapsed
                 else:
                     t_pre = 0.0
+                if hasattr(self, "load_dts"):
+                    t_load = self.load_dts.elapsed
+                else:
+                    t_load = 0.0
                 local_prob_array_XY = calculate_local_prob_dist_array(
                     self.current_job_data["X_client_discretized"],
                     self.current_job_data["y_client_partition"],
@@ -376,6 +386,7 @@ class ClientApp:
                 "compute_s": round(t_compute.elapsed, 6),
                 "comm_s": round(t_comm.elapsed, 6),
                 "pre_s": round(t_pre, 6),
+                "load_s": round(t_load, 6),
             }
             self.communicator.publish(BENCH_TOPIC, bench_payload, qos=0)
         except Exception as e_prob:

@@ -123,8 +123,9 @@ class ServerLogic:
         
         if not cid or comp is None or comm is None:
             return
-        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "compute": 0.0, "comm": 0.0, "queue": 0.0})
+        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "load": 0.0, "compute": 0.0, "comm": 0.0})
         entry["pre"]     += float(bench_json.get("pre_s", 0.0))
+        entry["load"]     += float(bench_json.get("load_s", 0.0))
         entry["compute"] += float(comp)
         entry["comm"]   += float(comm)
     
@@ -135,10 +136,11 @@ class ServerLogic:
         """
         if not self.bench_per_client:
             return 0.0, 0.0, 0.0
-        pre_max     = max(d["pre"]     for d in self.bench_per_client.values())
+        max_pre     = max(d["pre"]     for d in self.bench_per_client.values())
+        max_load     = max(d["load"]     for d in self.bench_per_client.values())
         max_compute = max(d["compute"] for d in self.bench_per_client.values())
         sum_comm    = max(d["comm"]   for d in self.bench_per_client.values())
-        return pre_max, max_compute, sum_comm
+        return max_load, max_pre, max_compute, sum_comm
     
     
     def add_or_update_active_client(self, sim_client_id, dataset_name):

@@ -1,8 +1,8 @@
 {
     "FS_FEDERATED": {
         "DATASET_TO_LOAD_GLOBALLY": "mnist",
-        "MI_FS_METHOD": "MIM",
-        "NUM_SIMULATED_CLIENTS_TOTAL": 2,
+        "MI_FS_METHOD": "JMI",
+        "NUM_SIMULATED_CLIENTS_TOTAL": 1,
         "DISTRIBUTION_TYPE": "non-iid",
         "NUM_BINS": 5,
         "TOP_K_FEATURES_TO_SELECT": 75,

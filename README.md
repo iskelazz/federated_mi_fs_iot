@@ -146,7 +146,11 @@ Archivo [classifier_evaluator.py](classifier_evaluator.py)
   - `load_predefined_test_set(dataset_base_name, project_root_path)`: Carga los dataset con conjunto de test independiente.
   - `load_selected_feature_indices(filepath)`: Carga los dataset sin conjunto de test independiente.
   - `evaluate_classifier(X_train, X_test, y_train, y_test, classifier_name, dataset_name_log)`: Ejecuta el proceso de clasificación, posteriormente muestra los resultados para un conjunto de métricas.
-  - - Carga de configuración de config.json (`load_simulation_config`).
+  - Carga de configuración de config.json (`load_simulation_config`).
+
+- **timer**
+Archivo[timer.py](timer.py)
+- Clase cuya finalidad es realizar conteos de tiempos en determinadas secciones del código.
   
 
 - **Utilidades**
