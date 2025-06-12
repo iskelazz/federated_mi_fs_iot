@@ -66,7 +66,7 @@ def load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization):
     Devuelve X_original, X_discretizado, y, o (None, None, None) en caso de error.
     """
     try:
-        X, y = load_dataset(dataset_name_to_load)
+        X, y, _ = load_dataset(dataset_name_to_load)
     except FileNotFoundError:
         print(f"Error: No se encontró el archivo del dataset para '{dataset_name_to_load}' según lo configurado en utils.py.")
         return None, None, None

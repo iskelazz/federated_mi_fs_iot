@@ -46,12 +46,21 @@ def load_dataset_mat(name):
     _, _, y = np.unique(y, return_index=True,return_inverse=True)
     return (X, y, None)
 
-def load_opportunity(return_subjects = False):
-    file_path = os.path.join(PROJECT_ROOT, 'datasets', 'opportunity' + '.mat')
+# utils.py
+def load_opportunity(return_subjects=False, relabel=True):
+    file_path = os.path.join(PROJECT_ROOT, 'datasets', 'opportunity.mat')
     mat = sp.loadmat(file_path)
-    X = mat["data"].astype(np.float32)
-    y = mat["labels"].ravel().astype(np.int16)
+
+    X        = mat["data"].astype(np.float32)
+    y_raw    = mat["labels"].ravel().astype(np.int64)   # Int64 para no desbordar
     subjects = mat["subjects"].ravel().astype(np.int8)
+
+    # Igualar comportamiento al resto de loaders
+    if relabel:
+        _, _, y = np.unique(y_raw, return_index=True, return_inverse=True)
+        y = y.astype(np.int16)
+    else:
+        y = y_raw.astype(np.int16)
 
     if return_subjects:
         return (X, y, subjects)
@@ -67,7 +76,7 @@ def load_dataset(dataset_name):
     elif dataset_name == "gas_sensor":
         data_tuple = load_dataset_mat("gas_sensor")
     elif dataset_name == "opportunity":
-        data_tuple = load_opportunity(return_subjects=True)
+        data_tuple = load_opportunity(return_subjects=True, relabel=True)
     elif dataset_name == "gisette":
         data_tuple = load_dataset_bin("gisette")
     elif dataset_name == "arcene":
