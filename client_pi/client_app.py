@@ -182,7 +182,11 @@ class ClientApp:
                 elif action == "REQUEST_JMI_BATCH_TRIPLET_PROBS":
                     self.process_jmi_batch_triplet_request(message_data)
                 elif action == "SEND_EMISSIONS_DATA": # Nuevo
-                    self.stop_save_and_send_emissions(EMISSIONS_DATA_TOPIC) 
+                    self.stop_save_and_send_emissions(EMISSIONS_DATA_TOPIC)
+                elif action == "START_PREPROCESS":
+                    self.pre_timer = Timer("cli_preproc")
+                    self.pre_timer.__enter__()
+                    self.calculate_and_send_local_extremes() 
                 else:
                     print(f"CLIENT_APP [{log_id}]: Acción '{action}' desconocida en {COMMAND_TOPIC}.")
             
@@ -244,7 +248,7 @@ class ClientApp:
                 self.tracker.stop_tracking() # Detener tracker si falla la carga
             return False
 
-    def _calculate_and_send_local_extremes(self):
+    def calculate_and_send_local_extremes(self):
         """
         Calcula los mínimos y máximos locales de la partición de datos actual
         y los envía al servidor.
@@ -287,9 +291,6 @@ class ClientApp:
             self.communicator.publish(STATUS_TOPIC, {"sim_client_id": log_id, "status": "RECEIVED_COMMAND_AND_INDICES"}, qos=1)
             
             self.load_dts.__exit__(None, None, None)
-            self.pre_timer = Timer("cli_preproc")
-            self.pre_timer.__enter__()
-            self._calculate_and_send_local_extremes()
         else:
             # El error ya fue logueado y el tracker (si se inició) manejado por _setup_job_and_load_data
             print(f"CLIENT_APP [{current_sim_id_for_log}]: Fallo en la configuración inicial del job. No se procede con el cálculo de extremos.")

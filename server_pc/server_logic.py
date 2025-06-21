@@ -420,7 +420,17 @@ class ServerLogic:
                  client_state = self.active_sim_clients.get(sim_client_id)
         
         if client_state:
-            if status == "RECEIVED_COMMAND_AND_INDICES": client_state.command_acked = True
+            if status == "RECEIVED_COMMAND_AND_INDICES":
+                client_state.command_acked = True
+
+                # ¿Han confirmado todos?
+                all_loaded = all(
+                    c.command_acked
+                    for c in self.active_sim_clients.values()
+                    if not c.error_message
+                )
+                if all_loaded:
+                    self._broadcast_start_preprocess()
             elif status == "GLOBAL_PARAMS_RECEIVED_ACK": client_state.global_params_acked_by_client = True
             elif status == "LOCAL_XY_PROB_DIST_PUBLISHED": client_state.local_XY_prob_dist_published = True
             elif status == "ERROR": 
@@ -448,6 +458,16 @@ class ServerLogic:
                         if all_reported_for_batch and not orchestrator.all_clients_reported_batch_event.is_set():
                             orchestrator.all_clients_reported_batch_event.set()
             
+
+    def _broadcast_start_preprocess(self):
+        for cid in self.active_sim_clients:
+            payload = {
+                "action": "START_PREPROCESS",
+                "sim_client_id": cid    # para que cada cliente filtre
+            }
+            self.communicator.publish(COMMAND_TOPIC, payload, qos=1)
+        print("SERVER_LOGIC: Todos los clientes han cargado datos; "
+            "orden START_PREPROCESS enviada.")
 
     def handle_pi_local_extremes(self, extremes_data):
         """
