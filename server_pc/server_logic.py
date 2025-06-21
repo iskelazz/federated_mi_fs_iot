@@ -114,34 +114,47 @@ class ServerLogic:
         print(f"Nueva ronda inicializada. Esperando {self.expected_clients_in_round} clientes. Método: {self.mi_method}, TopK: {self.top_k_features}")
 
     def handle_client_bench_update(self, bench_json):
-        """
-            Almacena los datos de tiempos tomados del cliente.
-        """
-        cid = bench_json.get("sim_client_id")
-        comp = bench_json.get("compute_s")
-        comm = bench_json.get("comm_s")
-        
-        if not cid or comp is None or comm is None:
+        cid   = bench_json.get("sim_client_id")
+        comp  = float(bench_json.get("compute_s", 0))
+        comm  = float(bench_json.get("comm_s",    0))
+        pre   = float(bench_json.get("pre_s",     0))
+        load  = float(bench_json.get("load_s",    0))
+
+        if not cid:
             return
-        entry = self.bench_per_client.setdefault(cid, {"pre": 0.0, "load": 0.0, "compute": 0.0, "comm": 0.0})
-        entry["pre"]     += float(bench_json.get("pre_s", 0.0))
-        entry["load"]     += float(bench_json.get("load_s", 0.0))
-        entry["compute"] += float(comp)
-        entry["comm"]   += float(comm)
+
+        entry = self.bench_per_client.setdefault(
+            cid, {"pre":0.0, "load":0.0, "compute":0.0, "comm":0.0,
+                "crit_no_load":0.0}
+        )
+        entry["pre"]    += pre
+        entry["load"]   += load
+        entry["compute"]+= comp
+        entry["comm"]   += comm
+
+        # camino crítico del cliente, **sin** la fase de carga
+        entry["crit_no_load"] = entry["pre"] + entry["compute"] + entry["comm"]
+
     
 
     def get_bench_summary(self):
         """
-            Devuelve los datos de tiempos tomados del cliente.
+        Devuelve (t_load, t_pre, t_compute, t_comm) **del cliente con
+        mayor crit_no_load**.  Si aún no hay datos -> 4 ceros.
         """
         if not self.bench_per_client:
-            return 0.0, 0.0, 0.0
-        max_pre     = max(d["pre"]     for d in self.bench_per_client.values())
-        max_load     = max(d["load"]     for d in self.bench_per_client.values())
-        max_compute = max(d["compute"] for d in self.bench_per_client.values())
-        sum_comm    = max(d["comm"]   for d in self.bench_per_client.values())
-        return max_load, max_pre, max_compute, sum_comm
-    
+            return 0.0, 0.0, 0.0, 0.0
+
+        # cliente cuyo camino crítico es mayor
+        slow_cid, slow_data = max(
+            self.bench_per_client.items(),
+            key=lambda kv: kv[1]["crit_no_load"]
+        )
+
+        return (slow_data["load"],
+                slow_data["pre"],
+                slow_data["compute"],
+                slow_data["comm"])
     
     def add_or_update_active_client(self, sim_client_id, dataset_name):
         """Añade un nuevo cliente o actualiza uno existente para la ronda."""
