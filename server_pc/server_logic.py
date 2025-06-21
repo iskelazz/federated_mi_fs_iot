@@ -4,6 +4,7 @@ import base64
 import zlib
 import numpy as np
 import os
+import time
 import sys
 import paho.mqtt.client as mqtt
 import threading
@@ -44,6 +45,7 @@ class ServerLogic:
         self.project_root_app = project_root_path # Para guardar archivos, etc.
 
         # Estado de la ronda y configuración
+        self.initial_time = None
         self.active_sim_clients = {}
         self.mi_method= "MIM"
         self.top_k_features = 15
@@ -430,6 +432,7 @@ class ServerLogic:
                     if not c.error_message
                 )
                 if all_loaded:
+                    self.initial_time = time.time()
                     self._broadcast_start_preprocess()
             elif status == "GLOBAL_PARAMS_RECEIVED_ACK": client_state.global_params_acked_by_client = True
             elif status == "LOCAL_XY_PROB_DIST_PUBLISHED": client_state.local_XY_prob_dist_published = True

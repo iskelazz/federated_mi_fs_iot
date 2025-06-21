@@ -182,7 +182,7 @@ def main():
         DISTRIBUTION_TYPE
     )
     
-    global_start_time = time.time()
+    #global_start_time = time.time()
     # --- Envío de Comandos Iniciales ---
     active_client_ids_for_round = []
     actual_clients_commanded = 0
@@ -234,7 +234,7 @@ def main():
         time.sleep(0.1)
     else: 
         print(f"Timeout esperando finalización de la fase inicial después de {initial_phase_monitor_timeout}s.")
-    elapsed_since_global_start = time.time() - global_start_time
+    elapsed_since_global_start = time.time() - server_handler.initial_time
     remaining_timeout_for_fs = TIMEOUT_SECONDS_OVERALL - elapsed_since_global_start
 
     #GESTIONA HILOS JMI
@@ -276,7 +276,7 @@ def main():
     print("Resumen final del estado de los clientes (post-procesamiento):")
     global_end_time = time.time()
     t_load_max, t_pre_max, t_compute_max, t_comm_sum = server_handler.get_bench_summary()
-    total_elapsed_time = global_end_time - global_start_time - t_load_max
+    total_elapsed_time = global_end_time - server_handler.initial_time
     summary = None
     if (MI_FS_METHOD == "JMI"): summary = server_handler.current_jmi_orchestrator.get_server_timing_summary()
     
