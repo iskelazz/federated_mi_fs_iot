@@ -112,8 +112,8 @@ def main():
                 t1 = time.time()
                 for ml_type in clf_type:
                     t2 = time.time()
-                    X_train_fs = X_train_disc[:, features_sel]
-                    X_test_fs  = X_test_disc[:, features_sel]
+                    X_train_fs = X_train #[:, features_sel]
+                    X_test_fs  = X_test #[:, features_sel]
                     
                     trainer = ModelTrainer(clf_type=ml_type, random_state=42)
                     result = trainer.fit_predict(X_train_fs, y_train, X_test_fs, y_test)
@@ -152,6 +152,8 @@ def main():
             print(f"\n{ml_type} = Accuracy media: {df['accuracy'].mean():.4f} ± {df['accuracy'].std():.4f}")
             print(f"\n{ml_type} = Recall macro medio: {df['recall'].mean():.4f} ± {df['recall'].std():.4f}")
             print(f"\n{ml_type} = F1-score macro medio: {df['f1_score'].mean():.4f} ± {df['f1_score'].std():.4f}")
+            print(f"\n{ml_type} = Tiempo medio entrenamiento: {df['train_time'].mean():.4f} ± {df['train_time'].std():.4f}")
+            print(f"\n{ml_type} = Tiempo medio prediccion: {df['pred_time'].mean():.4f} ± {df['pred_time'].std():.4f}")
     except ImportError:
         print("\nPandas no instalado, resultados no guardados en CSV.")
 

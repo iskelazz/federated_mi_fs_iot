@@ -1,7 +1,7 @@
 {
     "FS_FEDERATED": {
-        "DATASET_TO_LOAD_GLOBALLY": "madelon",
-        "MI_FS_METHOD": "JMI",
+        "DATASET_TO_LOAD_GLOBALLY": "human",
+        "MI_FS_METHOD": "MIM",
         "NUM_SIMULATED_CLIENTS_TOTAL": 2,
         "DISTRIBUTION_TYPE": "iid",
         "NUM_BINS": 5,
@@ -17,10 +17,10 @@
         "OPPORTUNITY_CROSS_SILO": false 
     },
     "FS_CENTRALIZED":{
-        "DATASET_TO_LOAD_GLOBALLY": "human",
+        "DATASET_TO_LOAD_GLOBALLY": "mnist",
         "TOP_K_FEATURES_TO_SELECT": 75,
         "NUM_BINS": 5,
-        "MI_FS_METHOD": "JMI",
-        "CLASSIFIER_METHOD": ["knn"]
+        "MI_FS_METHOD": "MIM",
+        "CLASSIFIER_METHOD": ["knn", "rf"]
     }
 }
