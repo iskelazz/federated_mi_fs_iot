@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import json
 from typing import Tuple, List
 import numpy as np
 import scipy.io as sp
 import os
 import matplotlib.pyplot as plt
+from sklearn.model_selection import StratifiedKFold
 
 XY = Tuple[np.ndarray, np.ndarray]
 XYList = List[XY]
@@ -87,34 +89,38 @@ def load_dataset(dataset_name):
         raise Exception("Invalid dataset", dataset_name) 
     return data_tuple
 
-def build_iid_data(dataset, num_users):
-    num_items = int(len(dataset)/num_users)
-    dict_users, all_idxs = {}, [i for i in range(len(dataset))]
+def build_iid_data(indices, labels, num_users):
+    indices = np.array(indices)
+    num_items = int(len(indices) / num_users)
+    dict_users = {}
+    all_idxs = indices.copy()
     for i in range(num_users):
-        user_items = set(np.random.choice(all_idxs, num_items, replace=False))
-        all_idxs = list(set(all_idxs) - user_items)
-        dict_users[i] = list(user_items)
+        user_items = np.random.choice(all_idxs, num_items, replace=False)
+        all_idxs = np.setdiff1d(all_idxs, user_items)
+        dict_users[i] = user_items.tolist()
     return dict_users
 
 
-def build_noniid_data(dataset, labels, num_users):
-    num_shards, num_imgs = 2 * num_users, len(labels) // (2 * num_users)
+def build_noniid_data(indices, labels, num_users):
+    indices = np.array(indices)
+    labels = np.array(labels)
+    num_shards, num_imgs = 2 * num_users, len(indices) // (2 * num_users)
     idx_shard = [i for i in range(num_shards)]
     dict_users = {i: np.array([], dtype='int64') for i in range(num_users)}
-    idxs = np.arange(num_shards * num_imgs)
-    
-    # sort labels
-    idxs_labels = np.vstack((idxs, labels[0:len(idxs)]))
-    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-    idxs = idxs_labels[0, :]
 
-    # divide and assign
+    # Aquí debes trabajar sobre los índices reales
+    # Ordena los índices según las etiquetas
+    sorted_indices = indices[np.argsort(labels, kind='mergesort')]
+    # Divide los índices ordenados en shards
+    shards = np.array_split(sorted_indices, num_shards)
+    shard_indices = list(range(num_shards))
+
     for i in range(num_users):
-        rand_set = set(np.random.choice(idx_shard, 2, replace=False))
-        idx_shard = list(set(idx_shard) - rand_set)
+        rand_set = set(np.random.choice(shard_indices, 2, replace=False))
+        shard_indices = list(set(shard_indices) - rand_set)
         for rand in rand_set:
-            dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
-        dict_users[i]  = list(dict_users[i].astype('int'))
+            dict_users[i] = np.concatenate((dict_users[i], shards[rand]), axis=0)
+        dict_users[i] = dict_users[i].astype(int).tolist()
     return dict_users
 
 
@@ -233,35 +239,29 @@ def calculate_uneven_quotas(total_samples, num_users, unevenness_factor):
     return quotas_int.tolist()
 
 
-def build_noniid_uneven_no_loss(labels, num_users, unevenness_factor = 0.5):
-    total_samples = len(labels)
-    all_original_indices = np.arange(total_samples)
+def build_noniid_uneven_no_loss(indices, labels, num_users, unevenness_factor = 0.5):
+    indices = np.array(indices)
+    labels = np.array(labels)
+    total_samples = len(indices)
 
     if total_samples == 0:
         return {i: [] for i in range(num_users)}
     if num_users == 0:
         return {}
 
-    # 1. Ordenar todos los índices originales según las etiquetas
-    sorted_global_indices = all_original_indices[np.argsort(labels, kind='mergesort')]
+    # Ordenar los índices globales según las etiquetas
+    sorted_indices = indices[np.argsort(labels, kind='mergesort')]
 
-    # 2. Calcular las cuotas (número de muestras) para cada usuario
+    # Calcular cuotas para cada usuario
     user_quotas = calculate_uneven_quotas(total_samples, num_users, unevenness_factor)
 
-    # 3. Distribuir bloques contiguos de la "pila ordenada"
     dict_users = {}
     current_pointer = 0
     for user_id in range(num_users):
         num_samples_for_this_user = user_quotas[user_id]
-
         start_index = current_pointer
         end_index = current_pointer + num_samples_for_this_user
-
-        # Asegurar que los índices no se salgan del array (no debería si las cuotas suman bien)
-        if end_index > total_samples:
-            end_index = total_samples 
-        
-        dict_users[user_id] = sorted_global_indices[start_index:end_index].tolist()
+        dict_users[user_id] = sorted_indices[start_index:end_index].tolist()
         current_pointer = end_index
 
     return dict_users
@@ -317,3 +317,24 @@ def plot_label_dispersion_matplotlib_only(device_label_counts, client_order, lab
     ax.legend(title='Etiquetas', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
     plt.tight_layout(rect=[0, 0, 0.85, 1]) # Ajustar para la leyenda
     plt.show()
+    
+
+def create_and_save_splits(X, y, n_repeats=3, n_folds=5, seed=42, file_path="splits.json"):
+    """
+    Crea y guarda splits de validación cruzada (repetida) estratificada.
+    """
+    all_splits = []
+    for rep in range(n_repeats):
+        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed+rep)
+        rep_splits = []
+        for train_idx, test_idx in skf.split(X, y):
+            rep_splits.append({"train_idx": train_idx.tolist(), "test_idx": test_idx.tolist()})
+        all_splits.append(rep_splits)
+    with open(file_path, "w") as f:
+        json.dump(all_splits, f)
+    print(f"Splits guardados en {file_path}")
+
+def load_splits(file_path):
+    with open(file_path, "r") as f:
+        all_splits = json.load(f)
+    return all_splits

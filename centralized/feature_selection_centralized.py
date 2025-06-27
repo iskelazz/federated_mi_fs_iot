@@ -2,38 +2,31 @@ import json
 import os
 import sys
 import time
-import numpy as np
+import pandas as pd
 
 try:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-
     if PROJECT_ROOT not in sys.path:
         sys.path.append(PROJECT_ROOT)
 except NameError:
-    # __file__ no está definido, probablemente se está ejecutando en un entorno interactivo
-    # Usar el directorio de trabajo actual como PROJECT_ROOT si no está ya en sys.path
-    PROJECT_ROOT = os.getcwd() # Guardamos el CWD para usarlo consistentemente
+    PROJECT_ROOT = os.getcwd()
     if PROJECT_ROOT not in sys.path:
         sys.path.append(PROJECT_ROOT)
 
 try:
-    from utils import load_dataset, discretize_equalwidth
+    from utils import load_dataset, discretize_equalwidth, load_splits
     from mutual_information import MIM, JMI
+    from model_trainer import ModelTrainer
 except ImportError as e:
     print(f"Error importando módulos desde la raíz del proyecto ('{PROJECT_ROOT}'): {e}")
     print("Asegúrate de que la estructura de tu proyecto es correcta y que utils.py y mutual_information.py están accesibles.")
     exit(1)
 
-# --- Parámetros de Configuración ---
-#DATASET_NAME = "arcene"
-#TOP_K_FEATURES = 75
-#N_BINS_DISCRETIZATION = 5
-#MI_TECHNIQUE_FUNCTION = JMI # Puedes cambiar esto a MIM si lo deseas
-
+# --- Parámetros de Configuración --- 
+# # O cargado de tu config
 
 def load_simulation_config(project_root_path, config_filename="config.json"):
-    """Carga la configuración de simulación desde un archivo JSON."""
     config_filepath = os.path.join(project_root_path, config_filename)
     default_config = {
         "DATASET_TO_LOAD_GLOBALLY": "arcene",
@@ -49,8 +42,7 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
         if config is None:
             print(f"Advertencia: La clave 'FS_CENTRALIZED' no se encontró en '{config_filepath}'. "
                   f"Usando la configuración por defecto completa para 'FS_CENTRALIZED'.")
-            # Si "FEATURE_SELECTION" no está, devolvemos el default completo para esta sección.
-            return config
+            return default_config
         for key in default_config:
             if key not in config:
                 config[key] = default_config[key]
@@ -60,64 +52,13 @@ def load_simulation_config(project_root_path, config_filename="config.json"):
         print(f"Error cargando configuración desde '{config_filepath}': {e}. Usando configuración por defecto.")
         return default_config
 
-def load_and_prepare_data(dataset_name_to_load, n_bins_for_discretization):
-    """
-    Carga el dataset, asegura la forma correcta de X y lo discretiza.
-    Devuelve X_original, X_discretizado, y, o (None, None, None) en caso de error.
-    """
-    try:
-        X, y, _ = load_dataset(dataset_name_to_load)
-    except FileNotFoundError:
-        print(f"Error: No se encontró el archivo del dataset para '{dataset_name_to_load}' según lo configurado en utils.py.")
-        return None, None, None
-    except Exception as e:
-        print(f"Ocurrió un error al cargar el dataset '{dataset_name_to_load}': {e}")
-        return None, None, None
-
-    if X.shape[0] == 0 or X.shape[1] == 0:
-        print(f"Error: X para '{dataset_name_to_load}' está vacío (0 muestras o 0 características).")
-        return None, None, None
-
-    # Discretizar características
-    try:
-        X_discrete = discretize_equalwidth(X.astype(np.float32), bins=n_bins_for_discretization)
-    except Exception as e:
-        print(f"Error durante la discretización de X para '{dataset_name_to_load}': {e}")
-        return None, None, None
-
-    return X, X_discrete, y
-
-def select_features_centralized(X_discrete_data, y_labels,
-                                mi_function, top_k, n_original_features):
-    """
-    Aplica la selección de características centralizada.
-    Devuelve los índices de las características seleccionadas (ordenados por relevancia) o None en caso de error.
-    """
-    effective_top_k = min(top_k, n_original_features)
-    try:
-        # Las funciones MIM y JMI deben devolver los índices ya ordenados por relevancia
-        selected_indices = mi_function(X_discrete_data, y_labels, topK=effective_top_k)
-        print(f"   Índices de las características seleccionadas (Primeras 20 de {len(selected_indices)}): {selected_indices[:20]}...")
-        return selected_indices
-    except Exception as e:
-        print(f"Ocurrió un error durante la selección de características con {mi_function.__name__}: {e}")
-        return None
-
-def save_selected_features_txt(selected_feature_indices,
-                               dataset_name_str, top_k_val, technique_name,
-                               project_root_path):
-    """
-    Guarda los índices de las características seleccionadas (ordenados por relevancia) en un archivo .txt.
-    """
+def save_selected_features_txt(selected_feature_indices, dataset_name_str, top_k_val, technique_name, project_root_path, rep_id=None, fold_id=None):
     main_datasets_folder = "selected_features"
-    #selected_subfolder = "datasets_seleccionados_central" # Misma subcarpeta para consistencia
-
     output_dir = os.path.join(project_root_path, main_datasets_folder)
     os.makedirs(output_dir, exist_ok=True)
-
-    output_filename = f"{dataset_name_str}_centralized_selected_top{top_k_val}_{technique_name}_feature_indices.txt"
+    fold_tag = f"_rep{rep_id}_fold{fold_id}" if rep_id is not None and fold_id is not None else ""
+    output_filename = f"{dataset_name_str}_centralized_selected_top{top_k_val}_{technique_name}{fold_tag}_feature_indices.txt"
     output_filepath = os.path.join(output_dir, output_filename)
-
     try:
         with open(output_filepath, 'w') as f:
             for feature_index in selected_feature_indices:
@@ -126,59 +67,95 @@ def save_selected_features_txt(selected_feature_indices,
     except Exception as e:
         print(f"Error guardando el archivo .txt de índices de características en '{output_filepath}': {e}")
 
-
 def main():
     cfg = load_simulation_config(PROJECT_ROOT)
 
-    # Extraer los parámetros de la configuración cargada
     dataset_name = cfg["DATASET_TO_LOAD_GLOBALLY"]
     top_k_features = cfg["TOP_K_FEATURES_TO_SELECT"]
     n_bins_discretization = cfg["NUM_BINS"]
     mi_fs_method = cfg["MI_FS_METHOD"]
-    mi_function = None
-    if mi_fs_method.upper() == "JMI":
-        mi_function = JMI  
-    elif mi_fs_method.upper() == "MIM":
-        mi_function = MIM
-    else:
-        print("Error: Técnica de IM {mi_fs_method} incorrecta")
-        return
-    
-    global_start_time = time.time()
-    print(f"--- Iniciando Selección de Características Centralizada para el dataset: {dataset_name} ---")
+    clf_type = cfg["CLASSIFIER_METHOD"]
+    mi_function = JMI if mi_fs_method.upper() == "JMI" else MIM
+
+    print(f"--- Iniciando Selección de Características Centralizada con validación cruzada 3x5 para: {dataset_name} ---")
     print(f"Usando Técnica de MI: {mi_function.__name__}")
     print(f"Top K Características a seleccionar: {top_k_features}")
     print(f"Número de bins para discretización: {n_bins_discretization}\n")
 
-    X_original, X_discrete, y = load_and_prepare_data(dataset_name, n_bins_discretization)
-    if X_original is None: # Si la carga o preparación falló
-        print(f"--- Proceso abortado para {dataset_name} debido a errores en la carga/preparación ---")
-        return
+    X, y, _ = load_dataset(dataset_name)
+    splits_path = os.path.join(SCRIPT_DIR, "..", "datasets", "splits", f"splits_{dataset_name}.json")
+    splits = load_splits(splits_path)
 
-    n_features_original = X_original.shape[1]
-
-    selected_indices = select_features_centralized(X_discrete, y,
-                                                 mi_function,
-                                                 top_k_features,
-                                                 n_features_original)
-
-    if selected_indices is None:
-        print(f"--- Proceso abortado para {dataset_name} debido a errores en la selección de características ---")
-        return
-
-    actual_top_k = min(top_k_features, n_features_original)
-
-    # Guardar los índices de las características seleccionadas en formato .txt
-    save_selected_features_txt(selected_indices,
-                               dataset_name, actual_top_k,
-                               mi_function.__name__,
-                               PROJECT_ROOT)
+    results_dict = {
+        "knn": [],
+        "rf": []
+    }
     
-    global_end_time = time.time()
-    total_elapsed_time = global_end_time - global_start_time
-    print(f"--- TIEMPO TOTAL DE EJECUCIÓN DEL SERVIDOR: {total_elapsed_time:.4f} segundos ---")
+    
+    for rep_id, rep_splits in enumerate(splits):
+        for fold_id, split in enumerate(rep_splits):
+            
+                print(f"\n>>> Repetición {rep_id+1} Fold {fold_id+1} <<<")
+                train_idx = split["train_idx"]
+                test_idx = split["test_idx"]
+                X_train, y_train = X[train_idx], y[train_idx]
+                X_test, y_test = X[test_idx], y[test_idx]
 
-    print(f"\n--- Proceso de Selección de Características Centralizada para {dataset_name} finalizado ---")
+                # Discretización: min/max SOLO en train
+                feature_ranges = [(X_train[:, i].min(), X_train[:, i].max()) for i in range(X_train.shape[1])]
+                X_train_disc = discretize_equalwidth(X_train, bins=n_bins_discretization, feature_ranges=feature_ranges)
+                X_test_disc  = discretize_equalwidth(X_test,  bins=n_bins_discretization, feature_ranges=feature_ranges)
+
+                # Selección de características
+                t0 = time.time()
+                features_sel = mi_function(X_train_disc, y_train, topK=top_k_features)
+                t1 = time.time()
+                for ml_type in clf_type:
+                    t2 = time.time()
+                    X_train_fs = X_train_disc[:, features_sel]
+                    X_test_fs  = X_test_disc[:, features_sel]
+                    
+                    trainer = ModelTrainer(clf_type=ml_type, random_state=42)
+                    result = trainer.fit_predict(X_train_fs, y_train, X_test_fs, y_test)
+                    acc = result["accuracy"]
+                    t3 = time.time()
+
+                    print(f"{ml_type} = Acc: {acc:.3f} | Tiempo selección: {t1-t0:.2f}s | Tiempo total fold: {(t3-t2)+(t1-t0):.2f}s | Features (top 10): {features_sel[:10]}")
+                    results_dict[ml_type].append({
+                        "rep": rep_id+1,
+                        "fold": fold_id+1,
+                        "accuracy": acc,
+                        "recall": result["recall"],
+                        "f1_score": result["f1_score"],
+                        "features_selected": features_sel.tolist(),
+                        "time_selection": t1-t0,
+                        "time_total": (t3-t2)+(t1-t0),
+                        "train_time": result["train_time"],
+                        "pred_time": result["pred_time"]
+                    })
+             # Guardar features seleccionadas de este fold (opcional)
+                save_selected_features_txt(features_sel, dataset_name, top_k_features, mi_function.__name__, PROJECT_ROOT, rep_id+1, fold_id+1)
+            
+
+    # Guardar resultados en CSV
+    try:
+        os.makedirs("results", exist_ok=True)
+        for ml_type in clf_type:
+            df = pd.DataFrame(results_dict[ml_type])
+            df.to_csv(f"results/results_{dataset_name}_{mi_fs_method}_{ml_type}_centralized_crossval.csv", index=False)
+            print(f"\nResultados de validación cruzada guardados en: results/results_{dataset_name}_{mi_fs_method}_{ml_type}_centralized_crossval.csv")
+            print(f"{ml_type} = Accuracy medio por repetición:")
+            print(df.groupby("rep")["accuracy"].mean())
+                
+                # --- Media y desviación estándar de todas las precisiones (sobre todos los folds) ---
+
+            print(f"\n{ml_type} = Accuracy media: {df['accuracy'].mean():.4f} ± {df['accuracy'].std():.4f}")
+            print(f"\n{ml_type} = Recall macro medio: {df['recall'].mean():.4f} ± {df['recall'].std():.4f}")
+            print(f"\n{ml_type} = F1-score macro medio: {df['f1_score'].mean():.4f} ± {df['f1_score'].std():.4f}")
+    except ImportError:
+        print("\nPandas no instalado, resultados no guardados en CSV.")
+
+    print(f"\n--- Proceso de Selección de Características Centralizada con validación cruzada 3x5 finalizado para {dataset_name} ---")
 
 if __name__ == "__main__":
     main()

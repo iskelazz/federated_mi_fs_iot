@@ -52,6 +52,8 @@ class ServerLogic:
         self.aggregation_method = "simple"
         self.global_num_bins = 5 
         self.expected_clients_in_round = 0
+        self.repeticion = 0
+        self.fold = 0
         # Colecciones de datos de la ronda
         self.collected_local_extremes = {}
         self.clients_reported_extremes_count = 0
@@ -80,7 +82,7 @@ class ServerLogic:
         self.communicator = comm_instance
         self.emissions_manager.set_dependencies(self.communicator, self.jmi_lock, self.active_sim_clients)
 
-    def set_round_parameters(self, mi_method, top_k, aggregation_method_str, num_bins):
+    def set_round_parameters(self, mi_method, top_k, aggregation_method_str, num_bins, repeticion, fold):
         """
             Función para sobreescribir los valores de configuración por defecto
         """
@@ -88,6 +90,8 @@ class ServerLogic:
         self.top_k_features = top_k
         self.aggregation_method = aggregation_method_str
         self.global_num_bins = num_bins
+        self.repeticion = repeticion
+        self.fold = fold
 
     def initialize_new_round(self, num_clients_expected_param):
         """
@@ -690,7 +694,7 @@ class ServerLogic:
         output_dir = os.path.join(self.project_root_app, main_datasets_folder)
         os.makedirs(output_dir, exist_ok=True)
 
-        output_filename = f"{dataset_name_str}_federated_selected_top{actual_k_selected}_{technique_name}_feature_indices.txt"
+        output_filename = f"{dataset_name_str}_federated_selected_top{actual_k_selected}_{technique_name}_rep{self.repeticion+1}_fold{self.fold+1}_feature_indices.txt"
         output_filepath = os.path.join(output_dir, output_filename)
 
         try:

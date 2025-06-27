@@ -31,6 +31,7 @@ class ServerEmissionsManager:
         self.collected_client_energy = {}
         self.client_reports_expected = 0
         self.client_reports_received = 0
+        self.last_emissions_summary = None
         
         self.communicator: Optional[MQTTCommunicator] = None
         self.jmi_lock = None # O un lock específico para emisiones
@@ -166,7 +167,20 @@ class ServerEmissionsManager:
                 print(f"    TOTAL GENERAL: {grand_total_emissions:.6f} kg")
                 print(f"---------------------------------------------------------------------")
                 
+                results_dict = {
+                    "server_energy_kwh": server_energy_kwh,
+                    "server_co2_kg": server_co2_kg,
+                    "total_client_energy_kwh": total_client_energy_kwh,
+                    "total_client_co2_kg": total_client_co2_kg,
+                    "grand_total_energy": grand_total_energy,
+                    "grand_total_emissions": grand_total_emissions,
+                    "n_clients_reporting": valid_client_reports_for_sum
+                }
+
+                self.last_emissions_summary = results_dict   # <--- NUEVA LÍNEA
                 # Reset para la próxima posible ronda de solicitud de emisiones
                 self.client_reports_expected = 0 
                 self.client_reports_received = 0
                 self.collected_client_energy.clear()
+                return results_dict
+            return None
