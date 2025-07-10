@@ -373,6 +373,8 @@ def main():
 
             # --- Paramos timer de selección de caracteristicas antes de entrenamiento
             global_end_time = time.time()
+            result = {}
+            server_handler.send_emission_request_to_clients()
             # --- Recupera features seleccionados (del txt generado)
             try:
                 features_selected = get_selected_features_from_server(
@@ -387,28 +389,39 @@ def main():
             X_test, y_test = X_global[test_idx], y_global[test_idx]
             X_test_fs = X_test[:, features_selected]
 
+
             # --- Ejecuta todos los clasificadores y guarda los índices de los resultados de este fold
             fold_results_idx = []
             for clf_type in clf_types:
                 trainer = ModelTrainer(clf_type=clf_type, random_state=42)
-                result = trainer.fit_predict(X_train_fs, labels_train, X_test_fs, y_test)
-                acc = result["accuracy"]
-                print(f"Fold {fold_id+1} | {clf_type} | Accuracy: {acc:.4f} | F1: {result['f1_score']:.4f} | Recall: {result['recall']:.4f}")
-                results.append({
-                    "rep": rep_id+1,
-                    "fold": fold_id+1,
-                    "clf_type": clf_type,
-                    "accuracy": acc,
-                    "f1_score": result["f1_score"],
-                    "recall": result["recall"],
-                    "train_time": result["train_time"],
-                    "pred_time": result["pred_time"],
-                    "features_selected": list(features_selected),
-                    "total_time_fs": global_end_time - server_handler.initial_time
-                    # (Las métricas de emisiones se añadirán después)
-                })
-                fold_results_idx.append(len(results) - 1)
 
+                try:
+                    # Si quieres omitir entrenamiento, comenta esta línea
+                    print("cx")
+                    #result = trainer.fit_predict(X_train_fs, labels_train, X_test_fs, y_test)
+                except Exception as e:
+                    print(f"ADVERTENCIA: Falló el entrenamiento con {clf_type} en rep {rep_id+1} fold {fold_id+1}: {e}")
+                    result = {}
+
+                if result and all(k in result for k in ("accuracy", "f1_score", "recall")):
+                    acc = result["accuracy"]
+                    print(f"Fold {fold_id+1} | {clf_type} | Accuracy: {acc:.4f} | F1: {result['f1_score']:.4f} | Recall: {result['recall']:.4f}")
+                    results.append({
+                        "rep": rep_id+1,
+                        "fold": fold_id+1,
+                        "clf_type": clf_type,
+                        "accuracy": acc,
+                        "f1_score": result["f1_score"],
+                        "recall": result["recall"],
+                        "train_time": result.get("train_time", None),
+                        "pred_time": result.get("pred_time", None),
+                        "features_selected": list(features_selected),
+                        "total_time_fs": global_end_time - server_handler.initial_time
+                    })
+                    fold_results_idx.append(len(results) - 1)
+                else:
+                    print(f"Fold {fold_id+1} | {clf_type} | Sin resultados disponibles. Entrenamiento omitido o fallido.")
+        
             # --- Métricas de tiempo de cada fold (solo una vez por fold)
             t_load_max, t_pre_max, t_compute_max, t_comm_sum = server_handler.get_bench_summary()
             total_elapsed_time = global_end_time - server_handler.initial_time
@@ -432,7 +445,7 @@ def main():
             benchmarks.append(per_fold_bench)
 
             # --- Solicita emisiones y añade los datos a todos los clasificadores de este fold
-            server_handler.send_emission_request_to_clients()
+            
             max_wait = 10
             waited = 0
             while (server_handler.emissions_manager.last_emissions_summary is None) and waited < max_wait:
@@ -440,10 +453,29 @@ def main():
                 waited += 0.5
 
             if server_handler.emissions_manager.last_emissions_summary:
-                for idx in fold_results_idx:
-                    results[idx].update(server_handler.emissions_manager.last_emissions_summary)
+                if fold_results_idx:
+                    for idx in fold_results_idx:
+                        results[idx].update(server_handler.emissions_manager.last_emissions_summary)
+                else:
+                    # Aquí insertamos una fila por clf_type aunque no haya entrenamiento
+                    for clf_type in clf_types:
+                        results.append({
+                            "rep": rep_id+1,
+                            "fold": fold_id+1,
+                            "clf_type": clf_type,
+                            "accuracy": None,
+                            "f1_score": None,
+                            "recall": None,
+                            "train_time": None,
+                            "pred_time": None,
+                            "features_selected": list(features_selected),
+                            "total_time_fs": global_end_time - server_handler.initial_time,
+                            **server_handler.emissions_manager.last_emissions_summary
+                        })
+                    print(f"Fold {fold_id+1} | {clf_type} | Solo se registraron emisiones (sin entrenamiento).")
             else:
                 print(f"ADVERTENCIA: No se recibieron datos de emisiones en el tiempo de espera ({max_wait}s) para este fold.")
+
 
             if communicator:
                 communicator.disconnect()
@@ -457,14 +489,15 @@ def main():
 
     # --- Muestra los resultados bien organizados por clasificador ---
     for clf_type in df["clf_type"].unique():
-        print(f"\nResultados para {clf_type}:")
-        print("Accuracy medio por repetición:")
-        print(df[df["clf_type"] == clf_type].groupby("rep")["accuracy"].mean())
-        print(f"Accuracy media total: {df[df['clf_type'] == clf_type]['accuracy'].mean():.4f} ± {df[df['clf_type'] == clf_type]['accuracy'].std():.4f}")
-        print(f"F1-score media total: {df[df['clf_type'] == clf_type]['f1_score'].mean():.4f} ± {df[df['clf_type'] == clf_type]['f1_score'].std():.4f}")
-        print(f"Recall media total: {df[df['clf_type'] == clf_type]['recall'].mean():.4f} ± {df[df['clf_type'] == clf_type]['recall'].std():.4f}")
-        print(f"Tiempo medio entrenamiento: {df[df['clf_type'] == clf_type]['train_time'].mean():.4f} s")
-        print(f"Tiempo medio predicción: {df[df['clf_type'] == clf_type]['pred_time'].mean():.4f} s")
+        if not df.empty and "clf_type" in df.columns:
+            print(f"\nResultados para {clf_type}:")
+            print("Accuracy medio por repetición:")
+            print(df[df["clf_type"] == clf_type].groupby("rep")["accuracy"].mean())
+            print(f"Accuracy media total: {df[df['clf_type'] == clf_type]['accuracy'].mean():.4f} ± {df[df['clf_type'] == clf_type]['accuracy'].std():.4f}")
+            print(f"F1-score media total: {df[df['clf_type'] == clf_type]['f1_score'].mean():.4f} ± {df[df['clf_type'] == clf_type]['f1_score'].std():.4f}")
+            print(f"Recall media total: {df[df['clf_type'] == clf_type]['recall'].mean():.4f} ± {df[df['clf_type'] == clf_type]['recall'].std():.4f}")
+            print(f"Tiempo medio entrenamiento: {df[df['clf_type'] == clf_type]['train_time'].mean():.4f} ± {df[df['clf_type'] == clf_type]['train_time'].std():.4f} s")
+            print(f"Tiempo medio predicción: {df[df['clf_type'] == clf_type]['pred_time'].mean():.4f} ± {df[df['clf_type'] == clf_type]['pred_time'].std():.4f} s")
 
         if "grand_total_energy" in df.columns:
             print(f"\nConsumo energético (kWh):")

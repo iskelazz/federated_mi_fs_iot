@@ -112,8 +112,8 @@ def main():
                 t1 = time.time()
                 for ml_type in clf_type:
                     t2 = time.time()
-                    X_train_fs = X_train #[:, features_sel]
-                    X_test_fs  = X_test #[:, features_sel]
+                    X_train_fs = X_train[:, features_sel]
+                    X_test_fs  = X_test[:, features_sel]
                     
                     trainer = ModelTrainer(clf_type=ml_type, random_state=42)
                     result = trainer.fit_predict(X_train_fs, y_train, X_test_fs, y_test)
