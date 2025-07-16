@@ -184,7 +184,7 @@ El sistema esta pensado para aplicar selección de carecteristicas sobre la part
   # En servidor
   python3 .\make_splits.py
   ```
-  Colocar el archivo con las particiones en /datasets/splits, este archivo aparecera en la raiz del proyecto con el nombre split_<nombre_dataset>.json. Ejem. arcene_splits.json  
+  Colocar el archivo con las particiones en /datasets/splits, este archivo aparecera en la raiz del proyecto con el nombre splits_<nombre_dataset>.json. Ejem. splits_arcene.json  
 
 ### 2. Configurar selección de caracteristicas
 
