@@ -170,13 +170,23 @@ Archivo: [`utils.py`](utils.py)
 > codecarbon,
 > mqtt.paho,
 > scikit-learn,
-> matplotlib
+> matplotlib,
+> pandas
 
 ---
 
 ## Uso
 
-### 1. Configurar selección de caracteristicas
+### 1. Hacer los cortes para la validación cruzada (OBLIGATORIO)
+El sistema esta pensado para aplicar selección de carecteristicas sobre la partición de entrenamiento y luego la clasificación con los clasificadores seleccionados.
+  Editar los valores de la validación cruzada y el dataset en el archivo make_splits.py, ejecutar el script:
+  ```bash
+  # En servidor
+  python3 .\make_splits.py
+  ```
+  Colocar el archivo con las particiones en /datasets/splits, este archivo aparecera en la raiz del proyecto con el nombre split_<nombre_dataset>.json. Ejem. arcene_splits.json  
+
+### 2. Configurar selección de caracteristicas
 
   En el archivo config.json de la raíz del proyecto debemos ajustar la selección de características con los parametros deseados.
   ```json
@@ -195,22 +205,15 @@ Archivo: [`utils.py`](utils.py)
         "AGGREGATION_METHOD": "simple",
         "UNEVENNESS_FACTOR_NONIID": 0.0,
         "PLOT_DISPERSION": false,
+        "CLASSIFIER_TYPE": ["knn", "rf"],
         "OPPORTUNITY_CROSS_SILO": true 
     },
     "FS_CENTRALIZED":{
         "DATASET_TO_LOAD_GLOBALLY": "arcene",
         "TOP_K_FEATURES_TO_SELECT": 75,
         "NUM_BINS": 5,
-        "MI_FS_METHOD": "JMI"
-    },
-    "CLASSIFIER": {
-        "DATASET_NAME": "mnist",
-        "CLASSIFIER_CHOICE": "KNN",
-        "TEST_SPLIT_RATIO":0.3,
-        "SCALE_FEATURES": true,
-        "USE_ALL_FEATURES": true,
-        "ITERATIONS": 5,
-        "FILE_NAME_FS": "mnist_federated_selected_top75_JMI_federated_feature_indices.txt"
+        "MI_FS_METHOD": "JMI",
+        "CLASSIFIER_METHOD": ["knn", "rf"]
     }
 }
   ```
@@ -231,6 +234,7 @@ Archivo: [`utils.py`](utils.py)
   - `AGGREGATION_METHOD`: "Simple", si todos los clientes tienen el mismo peso o "weighted" si el peso del cliente lo determinan sus muestras con respecto al total.
   - `UNEVENNESS_FACTOR_NONIID`: Si la distribución es non-iid, el valor de este factor es un float entre 0 y 1 determina el desbalanceo de muestras entre los clientes, siendo 0 un número identico de muestras entre los clientes y 1 un fuerte desbalanceo.
   - `PLOT_DISPERSION`: Si es true, devuelve un gráfico de barras apiladas que representa la dispersión del dataset entre los clientes.
+  - `CLASSIFIER_TYPE`: Clasificadores que se usaran para probar la selección de características.
   - `OPPORTUNITY_CROSS_SILO`: Si es true, el dataset es "opportunity" y el número de clientes = 4, aplica división por sujeto, ignorara el valor de DISTRIBUTION_TYPE y UNEVENNESS_FACTOR_NONIID
 
   ## FS_CENTRALIZED
@@ -241,20 +245,10 @@ Archivo: [`utils.py`](utils.py)
   - `TOP_K_FEATURES_TO_SELECT`: Número de caracteristicas a seleccionar.
   - `NUM_BINS`: Número de bins para la discretación de los datos de los datasets.
   - `MI_FS_METHOD`: Algoritmo de IM, puede ser MIM o JMI.
+  - `CLASSIFIER_TYPE`: Clasificadores que se usaran para probar la selección de características.
 
-  ## CLASSIFIER
-  Configuración necesaria para el proceso de clasificación.
 
-  **Parametros**:
-  - `DATASET_NAME`: Dataset sobre el cual se realiza el proceso de clasificación, debe ser un dataset válido para cargar en `load_dataset` de utils.py
-  - `CLASSIFIER_CHOICE`: Técnica de clasificación seleccionada, estan soportadas KNN (es kNN 5 vecinos), RF (Random Forest), NAIVE_BAYES (Método Naive bayes), LOGISTIC_REGRESSION (regresión logistica con kernel liblinear).
-  - `TEST_SPLIT_RATIO`: Partición entre el conjunto de entrenamiento y el de test, el valor (representado entre 0 y 1) es el porcentaje del conjunto de test, el resto se usara para entrenamiento.
-  - `SCALE_FEATURES`: Indica si se escalan o no las caracteristicas.
-  - `USE_ALL_FEATURES`: Si es true se entrenara el modelo con todas las características, si es falso usara el valor de FILE_NAME_FS, para seleccionar las caracteristicas indicadas en ese .txt.
-  - `ITERATIONS`: Iteraciones de entrenamientos y métricas con un dataset, tiene el objetivo de obtener un valor más consistente para la precisión asi como una desviación tipica.
-  - `FILE_NAME_FS`: Valor para indicar el nombre del archivo que contiene las características seleccionadas, se encontra por defecto en la carpeta /selected_features. 
-
-### 2. Iniciar clientes
+### 3. Iniciar clientes
 
   En cada raspberry pi acceder a la carpeta /client_pi y lanzar el siguiente comando en una terminal:
   ```bash
@@ -271,7 +265,7 @@ Archivo: [`utils.py`](utils.py)
   python3 .\client_pi.py --sim-id sim_client_2
   ```
 
-### 3. Selección de caracteristicas federado
+### 4. Selección de caracteristicas federado
 
   Para iniciar la selección de características hay que ejecutar, en la carpeta /server_pc, el siguiente comando:
   ```bash
@@ -279,9 +273,9 @@ Archivo: [`utils.py`](utils.py)
   python3 .\server_app
   ```
 
-  Usará la configuración de config.json de la raíz del proyecto (El bloque FS_FEDERATED), imprimirá los resultados por pantalla y guardará las características seleccionadas en la carpeta /selected_features de la raíz del proyecto. También almacenará los resultados de emisiones en la carpeta /emissions_output
+  Usará la configuración de config.json de la raíz del proyecto (El bloque FS_FEDERATED), imprimirá los resultados por pantalla y guardará las características seleccionadas en la carpeta /selected_features de la raíz del proyecto. También almacenará los resultados de emisiones en la carpeta /emissions_output. Realizara la selección de caracteristicas tal y como estean configuradas las particiones de la validación cruzada, ese número de veces y en cada selección realizara la clasificación con los métodos configurados y devolvera la media de los valores y su desviación tipica.
 
-### 4. Selección de caracteristicas centralizado
+### 5. Selección de caracteristicas centralizado
 
   Es un paso autónomo a los tres primeros, la configuración se realiza en el archivo de la raíz del proyecto config.json (el bloque FS_CENTRALIZED). El archivo ejecutable es /centralized/feature_selection_centralized.py
 
@@ -292,20 +286,12 @@ Archivo: [`utils.py`](utils.py)
 
   Los resultados también se almacenarán en la carpeta /selected_features del mismo modo que el caso federado.
 
-### 5. Calculo de TPR
+### 6. Calculo de TPR
 
-  Este es el cálculo de la Tasa de Verdaderos Positivos (TPR = TP/k) donde TP es el número de características comunes, y k es el número de características seleccionadas. Requiere haber completado los pasos 1, 2, 3 y 4 con la misma configuración. La instrucción en el terminal se lanza con la ruta del caso centralizado y federado `python3 .\calculate_TPR.py {dirección 1} {dirección 2}` el resultado se muestra en la terminal.
-
-  ```bash
-  python3 .\calculate_TPR.py selected_features\arcene_centralized_selected_top75_JMI_feature_indices.txt selected_features/arcene_federated_selected_top75_JMI_federated_feature_indices.txt
-  ```
-
-### 6. Proceso de clasificación
-
-  En este paso, usaremos algoritmos de clasificación (KNN, Random Forest y Regresión Logística) para valorar su rendimiento con las características seleccionadas y compararlo. La configuración de la clasificación se realizará en el archivo config.json de la raíz del proyecto (El bloque CLASSIFIER), devolverá métricas para cada iteración asi como una evaluación final más robusta con todas las iteraciones. Se debe ejecutar el archivo classifier_evaluator.py de la raíz del proyecto.
+  Este es el cálculo de la Tasa de Verdaderos Positivos (TPR = TP/k) donde TP es el número de características comunes, y k es el número de características seleccionadas. Requiere haber completado los pasos 1, 2, 3, 4 y 5 con la misma configuración. La instrucción en el terminal se lanza con la ruta del caso centralizado y federado `python3 .\calculate_TPR.py --fed_dir {dirección 1} --cent_dir {dirección 2} --dataset {nombre} --method {metodo de IM: MIM o JMI} --k {Numero de caracteristicas seleccionadas}`. Comparara 1 a 1 todos los resultados de la validación cruzada, almacenadas en el directorio y devolvera la media y la desviacón tipica. El resultado se muestra en la terminal.
 
   ```bash
-  python3 .\classifier_evaluator.py
+  python3 .\compare_TPR.py --fed_dir .\selected_features\ --cent_dir .\selected_features\centralized\madelon\ --dataset madelon --method JMI --k 75
   ```
 
 ## Datasets Folder
