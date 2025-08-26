@@ -397,8 +397,7 @@ def main():
 
                 try:
                     # Si quieres omitir entrenamiento, comenta esta línea
-                    print("cx")
-                    #result = trainer.fit_predict(X_train_fs, labels_train, X_test_fs, y_test)
+                    result = trainer.fit_predict(X_train_fs, labels_train, X_test_fs, y_test)
                 except Exception as e:
                     print(f"ADVERTENCIA: Falló el entrenamiento con {clf_type} en rep {rep_id+1} fold {fold_id+1}: {e}")
                     result = {}
