@@ -2,12 +2,36 @@
 
 > **Python version:** >= 3.8
 
-Esta es un herramienta de Python cuyo objetivo es seleccionar las caracteristicas de un conjunto de datos con mayor relevancia. Para lograrlo se hace uso de técnicas de información mutua; se usan las técnicas de MIM y JMI.
-La realización de este trabajo está pensada para ser utilizada en un entorno IoT. El objetivo es medir el rendimiento y consumo, y compararlo con soluciones centralizadas. Para ello vamos hacer uso de varias Raspberry Pi 5, el protocolo de comunicación usado es MQTT.
+## Descripción
 
----
+Este proyecto implementa un sistema de selección de características (Feature Selection) utilizando técnicas de Información Mutua (MIM y JMI) en un entorno de Aprendizaje Federado. El objetivo es identificar las características más relevantes de un conjunto de datos distribuido en dispositivos IoT (como Raspberry Pi) de manera eficiente y sin centralizar los datos.
 
-> **Aviso:** Se deben instalar las siguientes librerías para ejecutar este proyecto:
+## Motivación
+
+En el Internet de las Cosas (IoT), los dispositivos generan enormes cantidades de datos. Analizar estos datos de forma centralizada es costoso en términos de ancho de banda, latencia, privaciadad y consumo de energía. Este proyecto aborda ese desafío aplicando selección de características directamente en los dispositivos, permitiendo entrenar modelos de Machine Learning más ligeros y rápidos.
+
+## Características Principales
+
+* **Selección de Características Federada:** Utiliza algoritmos como JMI y MIM.
+* **Comunicación Eficiente:** Implementado sobre el protocolo MQTT.
+* **Análisis Comparativo:** Permite comparar el rendimiento y consumo con un enfoque centralizado.
+* **Configuración Flexible:** Parametriza fácilmente el entorno a través de un fichero `config.json`.
+
+## Instalación
+
+1.  Clona este repositorio:
+    ```bash
+    git clone [https://github.com/iskelazz/federated_mi_fs_iot.git](https://github.com/iskelazz/federated_mi_fs_iot.git)
+    cd federated_mi_fs_iot
+    ```
+
+2.  **(Opcional pero recomendado) Crea y activa un entorno virtual**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate 
+    ```
+
+3.  Instala las dependencias. Se deben instalar las siguientes librerías para ejecutar este proyecto:
 > numpy,
 > scipy,
 > codecarbon,
@@ -16,9 +40,13 @@ La realización de este trabajo está pensada para ser utilizada en un entorno I
 > matplotlib,
 > pandas
 
+```bash
+    pip install numpy scipy codecarbon paho-mqtt scikit-learn matplotlib pandas
+```
+
 ---
 
-## Uso
+## Guia de uso
 
 ### 1. Hacer los cortes para la validación cruzada (OBLIGATORIO)
 El sistema esta pensado para aplicar selección de carecteristicas sobre la partición de entrenamiento y luego la clasificación con los clasificadores seleccionados.
