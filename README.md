@@ -118,16 +118,16 @@ El sistema está pensado para aplicar selección de carecterísticas sobre la pa
   En cada Raspberry Pi acceder a la carpeta /client_pi y lanzar el siguiente comando en una terminal:
   ```bash
   # En Raspberry Pi 1
-  python3 .\client_pi.py --sim-id sim_client_0
+  python3 .\client_app.py --sim-id sim_client_0
   ```
   Para sucesivas raspberry pi debemos cambiar i, por números sucesivos (0,1,2...n), en el argumento de --sim-id donde i es: sim_client_{i}, por ejemplo:
   ```bash
   # En Raspberry Pi 2
-  python3 .\client_pi.py --sim-id sim_client_1
+  python3 .\client_app.py --sim-id sim_client_1
   ```
   ```bash
   # En Raspberry Pi 3
-  python3 .\client_pi.py --sim-id sim_client_2
+  python3 .\client_app.py --sim-id sim_client_2
   ```
 
 ### 4. Selección de características federado
